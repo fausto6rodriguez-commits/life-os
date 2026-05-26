@@ -1211,23 +1211,7 @@ function WorkDomainView({ domain, onUpdate }) {
                 fontFamily:"Georgia, serif", fontWeight:600 }}>{contact.name[0]}</span>
             </div>
             <div style={{ flex:1 }}>
-              {(() => {
-                const [editingName, setEditingName] = useState(false);
-                const [nameVal, setNameVal] = useState(contact.name);
-                return editingName ? (
-                  <input dir="ltr" value={nameVal} autoFocus
-                    onChange={e => setNameVal(e.target.value)}
-                    onBlur={() => { updateContact("name", nameVal); setEditingName(false); }}
-                    onKeyDown={e => { if (e.key==="Enter") { updateContact("name", nameVal); setEditingName(false); }}}
-                    style={{ fontSize:20, fontWeight:700, color:C.navy, fontFamily:"Georgia, serif",
-                      background:"transparent", border:"none", borderBottom:`2px solid ${domain.color}`,
-                      outline:"none", width:"100%", padding:"0 0 2px", marginBottom:2 }} />
-                ) : (
-                  <div onClick={() => { setNameVal(contact.name); setEditingName(true); }}
-                    style={{ fontSize:20, fontWeight:700, color:C.navy,
-                      fontFamily:"Georgia, serif", marginBottom:2, cursor:"text" }}>{contact.name}</div>
-                );
-              })()}
+              <EditField label="" field="name" value={contact.name} placeholder="Name" />
               <div style={{ fontSize:12, color:C.inkLight, fontStyle:"italic", marginBottom:8 }}>
                 <EditField label="" field="role" value={contact.role} placeholder="Role" />
                 <EditField label="" field="company" value={contact.company} placeholder="Company" />
