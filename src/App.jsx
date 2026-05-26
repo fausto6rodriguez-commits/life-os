@@ -1,4 +1,181 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+
+// ── SUPABASE ──────────────────────────────────────────────────────────────────
+const SUPA_URL = "https://qghuysyxvjukiwapbijh.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnaHV5c3l4dmp1a2l3YXBiaWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NjAzODgsImV4cCI6MjA5NTMzNjM4OH0.dMmv4TzmVXU-eKRTuoKdFG8D2v1Psb9rqyVHuRLkfdo";
+
+const supa = {
+  async from(table) {
+    const base = `${SUPA_URL}/rest/v1/${table}`;
+    const headers = {
+      "apikey": SUPA_KEY,
+      "Authorization": `Bearer ${SUPA_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=representation",
+    };
+    return {
+      async select(query = "*") {
+        const res = await fetch(`${base}?select=${query}`, { headers });
+        return res.json();
+      },
+      async upsert(data) {
+        const res = await fetch(base, {
+          method: "POST",
+          headers: { ...headers, "Prefer": "resolution=merge-duplicates,return=representation" },
+          body: JSON.stringify(Array.isArray(data) ? data : [data]),
+        });
+        return res.json();
+      },
+      async delete(match) {
+        const params = Object.entries(match).map(([k,v]) => `${k}=eq.${encodeURIComponent(v)}`).join("&");
+        const res = await fetch(`${base}?${params}`, { method: "DELETE", headers });
+        return res.ok;
+      },
+      async deleteIn(field, values) {
+        if (!values.length) return true;
+        const params = `${field}=in.(${values.map(v => encodeURIComponent(v)).join(",")})`;
+        const res = await fetch(`${base}?${params}`, { method: "DELETE", headers });
+        return res.ok;
+      },
+    };
+  }
+};
+
+// Save entire domain state to Supabase
+async function saveDomainToDb(domain) {
+  try {
+    const db = await supa.from("");
+    // Save domain rating
+    await (await supa.from("domains")).upsert({ id: domain.id, rating: domain.rating });
+    // Save goals
+    if (domain.goals?.length) {
+      await (await supa.from("goals")).upsert(domain.goals.map(g => ({
+        id: g.id, domain_id: domain.id, text: g.text,
+        quarter: g.quarter, progress: g.progress,
+        pillar: g.pillar || null, krs: g.krs || [],
+      })));
+    }
+    // Save KPIs
+    if (domain.kpis?.length) {
+      await (await supa.from("kpis")).upsert(domain.kpis.map(k => ({
+        id: k.id, domain_id: domain.id, label: k.label,
+        value: k.value, unit: k.unit || null,
+        delta: k.delta || null, pillar: k.pillar || null,
+      })));
+    }
+    // Save activities
+    if (domain.activities?.length) {
+      await (await supa.from("activities")).upsert(domain.activities.map(a => ({
+        id: a.id, domain_id: domain.id, text: a.text,
+        days: a.days || [], time: a.time || null,
+        duration: a.duration || 30, pillar: a.pillar || null,
+      })));
+    }
+    // Save work-specific data
+    if (domain.id === "work") {
+      if (domain.todos?.length) {
+        await (await supa.from("todos")).upsert(domain.todos.map(t => ({
+          id: t.id, text: t.text, horizon: t.horizon,
+          duration: t.duration || "30min",
+          project: t.project || null,
+          contact_id: t.contactId || null,
+          done: t.done || false,
+        })));
+      }
+      if (domain.contacts?.length) {
+        await (await supa.from("contacts")).upsert(domain.contacts.map(c => ({
+          id: c.id, name: c.name, company: c.company || null,
+          role: c.role || null, stage: c.stage || "prospect",
+          last_contact: c.lastContact || null,
+          email: c.email || null, phone: c.phone || null,
+          linkedin: c.linkedin || null,
+          personal: c.personal || null,
+          notes: c.notes || null,
+          ai_summary: c.aiSummary || null,
+        })));
+      }
+      if (domain.calls?.length) {
+        await (await supa.from("calls")).upsert(domain.calls.map(cl => ({
+          id: cl.id, contact_id: cl.contactId,
+          date: cl.date, notes: cl.notes,
+        })));
+      }
+    }
+  } catch (e) {
+    console.error("Save to DB failed:", e);
+  }
+}
+
+// Load all data from Supabase and merge into DOMAINS
+async function loadFromDb() {
+  try {
+    const [
+      domainsDb, goalsDb, kpisDb, activitiesDb,
+      todosDb, contactsDb, callsDb
+    ] = await Promise.all([
+      (await supa.from("domains")).select("*"),
+      (await supa.from("goals")).select("*"),
+      (await supa.from("kpis")).select("*"),
+      (await supa.from("activities")).select("*"),
+      (await supa.from("todos")).select("*"),
+      (await supa.from("contacts")).select("*"),
+      (await supa.from("calls")).select("*"),
+    ]);
+
+    return (d) => {
+      const dbDomain = Array.isArray(domainsDb) ? domainsDb.find(x => x.id === d.id) : null;
+      const dbGoals = Array.isArray(goalsDb) ? goalsDb.filter(x => x.domain_id === d.id) : [];
+      const dbKpis = Array.isArray(kpisDb) ? kpisDb.filter(x => x.domain_id === d.id) : [];
+      const dbActivities = Array.isArray(activitiesDb) ? activitiesDb.filter(x => x.domain_id === d.id) : [];
+
+      const merged = { ...d };
+      if (dbDomain) merged.rating = dbDomain.rating;
+      if (dbGoals.length) merged.goals = dbGoals.map(g => ({
+        id: g.id, text: g.text, quarter: g.quarter,
+        progress: g.progress, pillar: g.pillar,
+        krs: g.krs || [],
+      }));
+      if (dbKpis.length) merged.kpis = dbKpis.map(k => ({
+        id: k.id, label: k.label, value: k.value,
+        unit: k.unit, delta: k.delta, pillar: k.pillar,
+      }));
+      if (dbActivities.length) merged.activities = dbActivities.map(a => ({
+        id: a.id, text: a.text, days: a.days || [],
+        time: a.time, duration: a.duration, pillar: a.pillar,
+      }));
+
+      if (d.id === "work") {
+        if (Array.isArray(todosDb) && todosDb.length) {
+          merged.todos = todosDb.map(t => ({
+            id: t.id, text: t.text, horizon: t.horizon,
+            duration: t.duration, project: t.project,
+            contactId: t.contact_id, done: t.done,
+          }));
+        }
+        if (Array.isArray(contactsDb) && contactsDb.length) {
+          merged.contacts = contactsDb.map(c => ({
+            id: c.id, name: c.name, company: c.company,
+            role: c.role, stage: c.stage,
+            lastContact: c.last_contact,
+            email: c.email, phone: c.phone,
+            linkedin: c.linkedin, personal: c.personal,
+            notes: c.notes, aiSummary: c.ai_summary,
+          }));
+        }
+        if (Array.isArray(callsDb) && callsDb.length) {
+          merged.calls = callsDb.map(cl => ({
+            id: cl.id, contactId: cl.contact_id,
+            date: cl.date, notes: cl.notes,
+          }));
+        }
+      }
+      return merged;
+    };
+  } catch (e) {
+    console.error("Load from DB failed:", e);
+    return null;
+  }
+}
 
 const C = {
   bg:        "#f7f5f0",
@@ -1781,7 +1958,38 @@ for (let h = Math.ceil(HOUR_START_F); h < HOUR_END_F; h++) {
 
 function CalendarView({ domains }) {
   const [weekOffset, setWeekOffset]           = useState(0);
-  const [blocks, setBlocks]                   = useState([]);
+  const [blocks, setBlocks] = useState([]);
+
+  // Load calendar blocks from DB on mount
+  useEffect(() => {
+    supa.from("calendar_blocks").then(db => db.select("*").then(data => {
+      if (Array.isArray(data) && data.length) {
+        setBlocks(data.map(b => ({
+          id: b.id, text: b.text, dayIdx: b.day_idx,
+          slot: b.slot, slots: b.slots,
+          domainId: b.domain_id, domainLabel: b.domain_label,
+          domainColor: b.domain_color, weekKey: b.week_key,
+          activityId: b.activity_id,
+        })));
+      }
+    }));
+  }, []);
+
+  const saveBlocks = useCallback(async (newBlocks) => {
+    setBlocks(newBlocks);
+    try {
+      const db = await supa.from("calendar_blocks");
+      if (newBlocks.length) {
+        await db.upsert(newBlocks.map(b => ({
+          id: b.id, text: b.text, day_idx: b.dayIdx,
+          slot: b.slot, slots: b.slots,
+          domain_id: b.domainId || null, domain_label: b.domainLabel || null,
+          domain_color: b.domainColor || null, week_key: b.weekKey,
+          activity_id: b.activityId || null,
+        })));
+      }
+    } catch(e) { console.error("Block save failed:", e); }
+  }, []);
   const [drawerDomain, setDrawerDomain]       = useState(null);
   const [pickingActivity, setPickingActivity] = useState(null);
   const [movingBlock, setMovingBlock]         = useState(null);
@@ -1857,7 +2065,7 @@ function CalendarView({ domains }) {
       const ts = Math.max(0, Math.min(TOTAL_SLOTS - b.slots, Math.round(rawSlot)));
       let updated = blocks.map(x => x.id === movingBlock ? { ...x, dayIdx, slot: ts } : x);
       updated = pushBlocksDown(dayIdx, ts, b.slots, movingBlock, updated);
-      setBlocks(updated); setMovingBlock(null); return;
+      saveBlocks(updated); setMovingBlock(null); return;
     }
     if (pickingActivity) {
       const { activity } = pickingActivity;
@@ -1872,7 +2080,7 @@ function CalendarView({ domains }) {
       updated = pushBlocksDown(dayIdx, fs, slots, nb.id, updated);
       // Keep pickingActivity alive — user can keep placing on other days
       // Only clear once they cancel or pick a different activity
-      setBlocks(updated); return;
+      saveBlocks(updated); return;
     }
   };
 
@@ -1900,8 +2108,8 @@ function CalendarView({ domains }) {
     }
 
     if (dragging) {
-      const newSlot    = Math.max(0, Math.min(TOTAL_SLOTS - dragging.origSlots, currentSlot - dragging.grabOffsetSlots));
-      const newDayIdx  = dayIdx;
+      const newSlot   = Math.max(0, Math.min(TOTAL_SLOTS - dragging.origSlots, currentSlot - dragging.grabOffsetSlots));
+      const newDayIdx = dayIdx;
       setBlocks(prev => prev.map(b =>
         b.id === dragging.id ? { ...b, slot: newSlot, dayIdx: newDayIdx } : b
       ));
@@ -1909,6 +2117,10 @@ function CalendarView({ domains }) {
   };
 
   const onGridPointerUp = (e) => {
+    // Commit to DB on release
+    if (resizing || dragging) {
+      saveBlocks(blocks);
+    }
     if (resizing) { setResizing(null); return; }
     if (dragging) {
       // snap to nearest slot already done in move; just clear
@@ -2123,7 +2335,7 @@ function CalendarView({ domains }) {
 
                   {/* Delete */}
                   {!isPlacing && !dragging && !resizing && (
-                    <button onClick={e => { e.stopPropagation(); setBlocks(blocks.filter(x => x.id !== b.id)); }}
+                    <button onClick={e => { e.stopPropagation(); saveBlocks(blocks.filter(x => x.id !== b.id)); }}
                       style={{ position:"absolute", top:1, right:1,
                         background:"rgba(255,255,255,0.85)", border:"none",
                         borderRadius:2, color:C.red, fontSize:7,
@@ -2246,22 +2458,47 @@ export default function App() {
     document.body.setAttribute("dir", "ltr");
     document.body.style.direction = "ltr";
     document.body.style.unicodeBidi = "plaintext";
-    // Placeholder style for contentEditable
     const style = document.createElement("style");
     style.innerHTML = `[contenteditable][data-placeholder]:empty:before { content: attr(data-placeholder); color: #b8c4cc; pointer-events: none; font-style: italic; }`;
     document.head.appendChild(style);
   }, []);
+
   const [domains, setDomains] = useState(DOMAINS);
   const [selected, setSelected] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const updateDomain = (updated) => setDomains(domains.map(d => d.id === updated.id ? updated : d));
+  // Load from Supabase on mount
+  useEffect(() => {
+    loadFromDb().then(merger => {
+      if (merger) setDomains(DOMAINS.map(merger));
+      setLoading(false);
+    });
+  }, []);
+
+  // Save to Supabase whenever a domain changes
+  const updateDomain = useCallback((updated) => {
+    setDomains(prev => prev.map(d => d.id === updated.id ? updated : d));
+    saveDomainToDb(updated);
+  }, []);
+
   const activeDomain = domains.find(d => d.id === selected);
-
   const now = new Date();
   const hour = now.getHours();
   const timeWord = hour < 5 ? "night" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
   const dateStr = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+  if (loading) return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"center",
+      height:"100vh", background:C.bg, fontFamily:"Georgia, serif",
+      flexDirection:"column", gap:12 }}>
+      <div style={{ width:36, height:36, borderRadius:"50%", background:C.caqi,
+        display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <span style={{ fontSize:16, color:C.navy, fontWeight:700, fontStyle:"italic" }}>f</span>
+      </div>
+      <div style={{ fontSize:13, color:C.inkFaint, fontStyle:"italic" }}>Loading your life…</div>
+    </div>
+  );
 
   return (
     <div dir="ltr" style={{ background: C.bg, minHeight: "100vh", fontFamily: "Georgia, serif",
