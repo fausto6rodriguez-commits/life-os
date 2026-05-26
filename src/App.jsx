@@ -2026,10 +2026,12 @@ function CalendarView({ domains }) {
   const [drawerDomain, setDrawerDomain]       = useState(null);
   const [pickingActivity, setPickingActivity] = useState(null);
   const [movingBlock, setMovingBlock]         = useState(null);
-  // resize: { id, edge:"top"|"bottom", origSlot, origSlots }
-  // dragging: { id, origSlot, origDayIdx, grabOffsetSlots, startX, startY, moved }
-  const [resizing, setResizing]   = useState(null);
-  const [dragging, setDragging]   = useState(null);
+  const [resizing, setResizing]               = useState(null);
+  const [dragging, setDragging]               = useState(null);
+  const [scheduling, setScheduling]           = useState(false); // auto-scheduling todos
+  const [importing, setImporting]             = useState(false); // screenshot import
+  const [importMsg, setImportMsg]             = useState("");
+  const fileInputRef = useRef(null);
   const gridRef = useRef(null);
 
   // Get grid-relative Y and column from a pointer event
@@ -2119,6 +2121,161 @@ function CalendarView({ domains }) {
 
   const isPlaced = (actId, dayIdx) =>
     weekBlocks.some(b => b.activityId === actId && b.dayIdx === dayIdx);
+
+  // ── Auto-schedule todos ───────────────────────────────────────────────────
+  const WORK_START = minutesToSlot(9 * 60);   // 9am
+  const WORK_END   = minutesToSlot(19 * 60);  // 7pm
+  const DUR_TO_SLOTS = { "15min":1,"30min":1,"1hr":2,"2hr":4,"half-day":8,"full-day":16 };
+  const workDomain = domains.find(d => d.id === "work");
+
+  const autoScheduleTodos = () => {
+    setScheduling(true);
+    const thisWeekTodos = (workDomain?.todos || [])
+      .filter(t => t.horizon === "this week" && !t.done);
+    if (!thisWeekTodos.length) { setScheduling(false); return; }
+
+    // Remove previously scheduled todos before rescheduling
+    const baseBlocks = blocks.filter(b => b.weekKey !== weekKey || !b.id.startsWith("sched-"));
+    const existingThisWeek = blocks.filter(b => b.weekKey === weekKey && !b.id.startsWith("sched-"));
+
+    const newBlocks = [];
+    // Track occupied slots per day including existing non-scheduled blocks
+    const getOccupied = (dayIdx) => {
+      const set = new Set();
+      [...existingThisWeek, ...newBlocks].filter(b => b.dayIdx === dayIdx)
+        .forEach(b => { for (let s = b.slot; s < b.slot + b.slots; s++) set.add(s); });
+      return set;
+    };
+
+    const findFreeSlot = (dayIdx, numSlots) => {
+      const occ = getOccupied(dayIdx);
+      let s = WORK_START;
+      while (s + numSlots <= WORK_END) {
+        let free = true;
+        for (let i = s; i < s + numSlots; i++) { if (occ.has(i)) { free = false; break; } }
+        if (free) return s;
+        s++;
+      }
+      return null;
+    };
+
+    thisWeekTodos.forEach((todo, i) => {
+      const slots = DUR_TO_SLOTS[todo.duration] || 1;
+      // Find the day with earliest free slot
+      let bestDay = null, bestSlot = null;
+      for (let d = 0; d < 5; d++) {
+        const fs = findFreeSlot(d, slots);
+        if (fs !== null && (bestSlot === null || fs < bestSlot)) {
+          bestDay = d; bestSlot = fs;
+        }
+      }
+      if (bestDay === null) return; // no room anywhere
+
+      newBlocks.push({
+        id: `sched-${todo.id}-${Date.now()}-${i}`,
+        text: todo.text,
+        dayIdx: bestDay, slot: bestSlot, slots,
+        domainId: "work", domainLabel: "Work",
+        domainColor: workDomain?.color || "#1a6080",
+        weekKey, activityId: null,
+      });
+    });
+
+    const updated = [...baseBlocks, ...existingThisWeek, ...newBlocks];
+    saveBlocks(updated);
+    setScheduling(false);
+  };
+
+  // ── Screenshot import ─────────────────────────────────────────────────────
+  const importFromScreenshot = async (file) => {
+    setImporting(true);
+    setImportMsg("Reading your calendar screenshot…");
+    try {
+      const base64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result.split(",")[1]);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: { type: "base64", media_type: file.type || "image/png", data: base64 }
+              },
+              {
+                type: "text",
+                text: `This is a screenshot of a calendar (likely Outlook or similar). Extract all visible meetings/events.
+
+For each meeting return JSON with this exact structure:
+{
+  "meetings": [
+    {
+      "title": "meeting name",
+      "day": "Mon|Tue|Wed|Thu|Fri|Sat|Sun",
+      "startTime": "HH:MM",
+      "endTime": "HH:MM"
+    }
+  ]
+}
+
+Only return the JSON, nothing else. Use 24-hour time format. If you cannot determine exact times, make a reasonable estimate from the visual position. Only include meetings visible in the screenshot.`
+              }
+            ]
+          }]
+        })
+      });
+
+      const data = await response.json();
+      const text = data.content?.find(b => b.type === "text")?.text || "{}";
+      const clean = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(clean);
+      const meetings = parsed.meetings || [];
+
+      if (!meetings.length) {
+        setImportMsg("No meetings found in screenshot.");
+        setImporting(false);
+        return;
+      }
+
+      // Convert meetings to calendar blocks
+      const newBlocks = meetings.map((m, i) => {
+        const dayIdx = DAYS.indexOf(m.day);
+        if (dayIdx === -1) return null;
+        const [sh, sm] = m.startTime.split(":").map(Number);
+        const [eh, em] = m.endTime.split(":").map(Number);
+        const startSlot = Math.round(minutesToSlot(sh * 60 + sm));
+        const endSlot   = Math.round(minutesToSlot(eh * 60 + em));
+        const slots = Math.max(1, endSlot - startSlot);
+        return {
+          id: `import-${Date.now()}-${i}`,
+          text: m.title,
+          dayIdx, slot: startSlot, slots,
+          domainId: null, domainLabel: "Meeting",
+          domainColor: "#6b7280",
+          weekKey, activityId: null,
+        };
+      }).filter(Boolean);
+
+      const updated = [...blocks.filter(b => b.weekKey !== weekKey || !b.id.startsWith("import-")),
+        ...weekBlocks.filter(b => !b.id.startsWith("import-")),
+        ...newBlocks];
+      saveBlocks(updated);
+      setImportMsg(`Imported ${newBlocks.length} meeting${newBlocks.length !== 1 ? "s" : ""}. Now tap "Schedule todos" to fill the gaps.`);
+    } catch(e) {
+      console.error("Import failed:", e);
+      setImportMsg("Import failed — try a clearer screenshot.");
+    }
+    setImporting(false);
+  };
 
   // ── Drag & resize pointer handlers ────────────────────────────────────────
   const onGridPointerMove = (e) => {
@@ -2224,6 +2381,42 @@ function CalendarView({ domains }) {
           </span>
           <button onClick={() => { setPickingActivity(null); setMovingBlock(null); }}
             style={{ background:"transparent",border:"none",color:C.caqi,cursor:"pointer",fontSize:14,padding:0 }}>✕</button>
+        </div>
+      )}
+
+      {/* Smart scheduling strip */}
+      <div style={{ display:"flex", gap:8, marginBottom:10, flexWrap:"wrap" }}>
+        {/* Schedule todos button */}
+        <button onClick={autoScheduleTodos} disabled={scheduling}
+          style={{ flex:1, background: scheduling ? C.border : C.navy,
+            border:"none", borderRadius:6, color:"#fff", fontSize:12,
+            padding:"8px 12px", cursor: scheduling ? "default" : "pointer",
+            fontFamily:"Georgia, serif", fontStyle:"italic", opacity: scheduling ? 0.6 : 1 }}>
+          {scheduling ? "Scheduling…" : "📋 Schedule todos around meetings"}
+        </button>
+
+        {/* Screenshot import button */}
+        <button onClick={() => fileInputRef.current?.click()} disabled={importing}
+          style={{ flex:1, background: importing ? C.border : "transparent",
+            border:`1.5px solid ${C.caqi}`, borderRadius:6,
+            color: importing ? C.inkFaint : C.caqi, fontSize:12,
+            padding:"8px 12px", cursor: importing ? "default" : "pointer",
+            fontFamily:"Georgia, serif", fontStyle:"italic" }}>
+          {importing ? "Reading…" : "📷 Import from screenshot"}
+        </button>
+        <input ref={fileInputRef} type="file" accept="image/*"
+          style={{ display:"none" }}
+          onChange={e => { if (e.target.files?.[0]) importFromScreenshot(e.target.files[0]); }} />
+      </div>
+
+      {/* Import status message */}
+      {importMsg && (
+        <div style={{ background: C.caqiLight, border:`1px solid ${C.caqi}33`,
+          borderRadius:6, padding:"8px 12px", marginBottom:8,
+          display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span style={{ fontSize:12, color:C.caqi, fontFamily:"Georgia, serif", fontStyle:"italic" }}>{importMsg}</span>
+          <button onClick={() => setImportMsg("")}
+            style={{ background:"transparent", border:"none", color:C.caqi, cursor:"pointer", fontSize:14, padding:0 }}>✕</button>
         </div>
       )}
 
