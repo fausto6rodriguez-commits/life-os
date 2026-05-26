@@ -41,13 +41,18 @@ const supa = {
   }
 };
 
+// Delete a record from a Supabase table by id
+async function deleteFromDb(table, id) {
+  try {
+    await (await supa.from(table)).delete({ id });
+  } catch(e) { console.error(`Delete from ${table} failed:`, e); }
+}
+
 // Save entire domain state to Supabase
 async function saveDomainToDb(domain) {
   try {
-    const db = await supa.from("");
-    // Save domain rating
     await (await supa.from("domains")).upsert({ id: domain.id, rating: domain.rating });
-    // Save goals
+
     if (domain.goals?.length) {
       await (await supa.from("goals")).upsert(domain.goals.map(g => ({
         id: g.id, domain_id: domain.id, text: g.text,
@@ -55,7 +60,6 @@ async function saveDomainToDb(domain) {
         pillar: g.pillar || null, krs: g.krs || [],
       })));
     }
-    // Save KPIs
     if (domain.kpis?.length) {
       await (await supa.from("kpis")).upsert(domain.kpis.map(k => ({
         id: k.id, domain_id: domain.id, label: k.label,
@@ -63,7 +67,6 @@ async function saveDomainToDb(domain) {
         delta: k.delta || null, pillar: k.pillar || null,
       })));
     }
-    // Save activities
     if (domain.activities?.length) {
       await (await supa.from("activities")).upsert(domain.activities.map(a => ({
         id: a.id, domain_id: domain.id, text: a.text,
@@ -71,10 +74,12 @@ async function saveDomainToDb(domain) {
         duration: a.duration || 30, pillar: a.pillar || null,
       })));
     }
-    // Save work-specific data
+
     if (domain.id === "work") {
+      // Sync todos — upsert all, then delete any in DB not in current list
+      const todoDb = await supa.from("todos");
       if (domain.todos?.length) {
-        await (await supa.from("todos")).upsert(domain.todos.map(t => ({
+        await todoDb.upsert(domain.todos.map(t => ({
           id: t.id, text: t.text, horizon: t.horizon,
           duration: t.duration || "30min",
           project: t.project || null,
@@ -82,23 +87,44 @@ async function saveDomainToDb(domain) {
           done: t.done || false,
         })));
       }
+      // Delete todos removed from state
+      const allTodosDb = await todoDb.select("id");
+      if (Array.isArray(allTodosDb)) {
+        const currentIds = new Set((domain.todos||[]).map(t => t.id));
+        const toDelete = allTodosDb.filter(r => !currentIds.has(r.id)).map(r => r.id);
+        if (toDelete.length) await todoDb.deleteIn("id", toDelete);
+      }
+
       if (domain.contacts?.length) {
         await (await supa.from("contacts")).upsert(domain.contacts.map(c => ({
           id: c.id, name: c.name, company: c.company || null,
           role: c.role || null, stage: c.stage || "prospect",
           last_contact: c.lastContact || null,
           email: c.email || null, phone: c.phone || null,
-          linkedin: c.linkedin || null,
-          personal: c.personal || null,
-          notes: c.notes || null,
-          ai_summary: c.aiSummary || null,
+          linkedin: c.linkedin || null, personal: c.personal || null,
+          notes: c.notes || null, ai_summary: c.aiSummary || null,
         })));
       }
+      // Delete contacts removed from state
+      const contactsDb = await (await supa.from("contacts")).select("id");
+      if (Array.isArray(contactsDb)) {
+        const currentIds = new Set((domain.contacts||[]).map(c => c.id));
+        const toDelete = contactsDb.filter(r => !currentIds.has(r.id)).map(r => r.id);
+        if (toDelete.length) await (await supa.from("contacts")).deleteIn("id", toDelete);
+      }
+
       if (domain.calls?.length) {
         await (await supa.from("calls")).upsert(domain.calls.map(cl => ({
           id: cl.id, contact_id: cl.contactId,
           date: cl.date, notes: cl.notes,
         })));
+      }
+      // Delete calls removed from state
+      const callsDb = await (await supa.from("calls")).select("id");
+      if (Array.isArray(callsDb)) {
+        const currentIds = new Set((domain.calls||[]).map(cl => cl.id));
+        const toDelete = callsDb.filter(r => !currentIds.has(r.id)).map(r => r.id);
+        if (toDelete.length) await (await supa.from("calls")).deleteIn("id", toDelete);
       }
     }
   } catch (e) {
@@ -1987,6 +2013,13 @@ function CalendarView({ domains }) {
           domain_color: b.domainColor || null, week_key: b.weekKey,
           activity_id: b.activityId || null,
         })));
+      }
+      // Delete any blocks in DB not in new list
+      const allInDb = await db.select("id");
+      if (Array.isArray(allInDb)) {
+        const currentIds = new Set(newBlocks.map(b => b.id));
+        const toDelete = allInDb.filter(r => !currentIds.has(r.id)).map(r => r.id);
+        if (toDelete.length) await db.deleteIn("id", toDelete);
       }
     } catch(e) { console.error("Block save failed:", e); }
   }, []);
