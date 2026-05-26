@@ -1002,6 +1002,7 @@ function WorkDomainView({ domain, onUpdate }) {
   const [addingContact, setAddingContact] = useState(false);
   const [selectedCall, setSelectedCall]   = useState(null);
   const [writingCall, setWritingCall]     = useState(null);
+  const [editingNoteId, setEditingNoteId] = useState(null);
   const [notesQuery, setNotesQuery]       = useState("");
   const [notesAnswer, setNotesAnswer]     = useState("");
   const [queryingNotes, setQueryingNotes] = useState(false);
@@ -1332,21 +1333,39 @@ function WorkDomainView({ domain, onUpdate }) {
     const today = new Date().toLocaleDateString("en-US", { month:"long", day:"numeric" });
     const isWriting = writingCall?.contactId === selectedContact;
     const noteRef = useRef(null);
+    const editNoteRef = useRef(null);
 
     const updateContact = (field, value) =>
       setContacts(contacts.map(c => c.id===selectedContact ? { ...c, [field]:value } : c));
 
+    // Strip HTML to plain text for AI
+    const stripHtml = (html) => {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      return tmp.innerText || tmp.textContent || "";
+    };
+
     const saveNote = async () => {
-      const text = noteRef.current?.innerText?.trim() || "";
+      const html = noteRef.current?.innerHTML?.trim() || "";
+      const text = stripHtml(html);
       if (!text || !selectedContact) { setWritingCall(null); return; }
       const newCall = { id:`cl${Date.now()}`, contactId:selectedContact,
-        date: writingCall?.date || today, notes: text };
+        date: writingCall?.date || today, notes: html };
       const updated = [newCall, ...calls];
       onUpdate({ ...domain, calls: updated,
         contacts: (domain.contacts||[]).map(c =>
           c.id===selectedContact ? { ...c, lastContact: newCall.date } : c) });
       setWritingCall(null);
-      setTimeout(() => generateSummary(selectedContact), 100);
+      // Pass fresh calls directly to avoid stale closure
+      setTimeout(() => generateSummaryFromCalls(selectedContact, updated), 150);
+    };
+
+    const saveEditedNote = (noteId) => {
+      const html = editNoteRef.current?.innerHTML?.trim() || "";
+      if (!html) { setEditingNoteId(null); return; }
+      const updated = calls.map(cl => cl.id === noteId ? { ...cl, notes: html } : cl);
+      onUpdate({ ...domain, calls: updated });
+      setEditingNoteId(null);
     };
 
     // Inline editable field
@@ -1498,27 +1517,61 @@ function WorkDomainView({ domain, onUpdate }) {
 
           {/* Writing canvas */}
           {isWriting && (
-            <div style={{ margin:"14px 0", padding:14, background:C.surface,
+            <div style={{ margin:"14px 0", background:C.surface,
               border:`1px solid ${domain.color}44`, borderLeft:`3px solid ${domain.color}`,
-              borderRadius:6 }}>
-              <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
-                textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>{today}</div>
-              <div ref={noteRef} dir="ltr" contentEditable suppressContentEditableWarning
-                style={{ width:"100%", minHeight:140, background:"transparent", border:"none",
-                  color:C.ink, fontSize:14, fontFamily:"Georgia, serif", lineHeight:1.8,
-                  padding:0, outline:"none", direction:"ltr", textAlign:"left",
-                  whiteSpace:"pre-wrap", wordBreak:"break-word" }}
-                data-placeholder="Write freely…" />
-              <div style={{ display:"flex", justifyContent:"flex-end", gap:8,
-                borderTop:`1px solid ${C.border}`, paddingTop:10, marginTop:8 }}>
-                <button onClick={() => setWritingCall(null)}
-                  style={{ background:"transparent", border:`1px solid ${C.border}`,
-                    borderRadius:4, color:C.inkFaint, fontSize:12, padding:"5px 12px",
-                    cursor:"pointer", fontFamily:"inherit" }}>Discard</button>
-                <button onClick={saveNote}
-                  style={{ background:domain.color, border:"none", borderRadius:4,
-                    color:"#fff", fontSize:12, padding:"5px 16px", cursor:"pointer",
-                    fontFamily:"inherit", fontWeight:600 }}>Save + summarize</button>
+              borderRadius:6, overflow:"hidden" }}>
+              {/* Rich text toolbar */}
+              <div style={{ display:"flex", gap:2, padding:"6px 10px",
+                borderBottom:`1px solid ${C.border}`, flexWrap:"wrap" }}>
+                {[
+                  { cmd:"bold",          icon:"B",  style:{ fontWeight:700 } },
+                  { cmd:"italic",        icon:"I",  style:{ fontStyle:"italic" } },
+                  { cmd:"underline",     icon:"U",  style:{ textDecoration:"underline" } },
+                ].map(({ cmd, icon, style:s }) => (
+                  <button key={cmd}
+                    onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
+                    style={{ background:"transparent", border:`1px solid ${C.border}`,
+                      borderRadius:3, width:26, height:24, cursor:"pointer",
+                      fontSize:12, color:C.inkMid, ...s }}>
+                    {icon}
+                  </button>
+                ))}
+                <div style={{ width:1, background:C.border, margin:"0 4px" }} />
+                {[
+                  { cmd:"insertUnorderedList", icon:"• —" },
+                  { cmd:"insertOrderedList",   icon:"1." },
+                  { cmd:"indent",              icon:"→" },
+                  { cmd:"outdent",             icon:"←" },
+                ].map(({ cmd, icon }) => (
+                  <button key={cmd}
+                    onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
+                    style={{ background:"transparent", border:`1px solid ${C.border}`,
+                      borderRadius:3, padding:"0 7px", height:24, cursor:"pointer",
+                      fontSize:11, color:C.inkMid, fontFamily:"'Courier New', monospace" }}>
+                    {icon}
+                  </button>
+                ))}
+              </div>
+              <div style={{ padding:14 }}>
+                <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
+                  textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>{today}</div>
+                <div ref={noteRef} dir="ltr" contentEditable suppressContentEditableWarning
+                  style={{ width:"100%", minHeight:140, background:"transparent", border:"none",
+                    color:C.ink, fontSize:14, fontFamily:"Georgia, serif", lineHeight:1.8,
+                    outline:"none", direction:"ltr", textAlign:"left",
+                    whiteSpace:"pre-wrap", wordBreak:"break-word" }}
+                  data-placeholder="Write freely…" />
+                <div style={{ display:"flex", justifyContent:"flex-end", gap:8,
+                  borderTop:`1px solid ${C.border}`, paddingTop:10, marginTop:10 }}>
+                  <button onClick={() => setWritingCall(null)}
+                    style={{ background:"transparent", border:`1px solid ${C.border}`,
+                      borderRadius:4, color:C.inkFaint, fontSize:12, padding:"5px 12px",
+                      cursor:"pointer", fontFamily:"inherit" }}>Discard</button>
+                  <button onClick={saveNote}
+                    style={{ background:domain.color, border:"none", borderRadius:4,
+                      color:"#fff", fontSize:12, padding:"5px 16px", cursor:"pointer",
+                      fontFamily:"inherit", fontWeight:600 }}>Save + summarize</button>
+                </div>
               </div>
             </div>
           )}
@@ -1624,14 +1677,86 @@ function WorkDomainView({ domain, onUpdate }) {
               {contactNotes.map(cl => (
                 <div key={cl.id} style={{ marginBottom:18, paddingBottom:18,
                   borderBottom:`1px solid ${C.border}` }}>
-                  <div style={{ fontSize:11, color:domain.color,
-                    fontFamily:"'Courier New', monospace", marginBottom:6 }}>{cl.date}</div>
-                  <div style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif",
-                    lineHeight:1.8, whiteSpace:"pre-wrap" }}>{cl.notes}</div>
-                  <button onClick={() => onUpdate({ ...domain, calls: calls.filter(x => x.id!==cl.id) })}
-                    style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
-                      borderRadius:4, color:C.inkFaint, fontSize:10, padding:"3px 10px",
-                      cursor:"pointer", fontFamily:"inherit", marginTop:8 }}>Delete</button>
+                  <div style={{ display:"flex", justifyContent:"space-between",
+                    alignItems:"center", marginBottom:8 }}>
+                    <div style={{ fontSize:11, color:domain.color,
+                      fontFamily:"'Courier New', monospace" }}>{cl.date}</div>
+                    <div style={{ display:"flex", gap:6 }}>
+                      {editingNoteId === cl.id ? (
+                        <>
+                          <button onClick={() => saveEditedNote(cl.id)}
+                            style={{ background:domain.color, border:"none", borderRadius:3,
+                              color:"#fff", fontSize:10, padding:"2px 10px",
+                              cursor:"pointer", fontFamily:"inherit" }}>Save</button>
+                          <button onClick={() => setEditingNoteId(null)}
+                            style={{ background:"transparent", border:`1px solid ${C.border}`,
+                              borderRadius:3, color:C.inkFaint, fontSize:10,
+                              padding:"2px 8px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => setEditingNoteId(cl.id)}
+                            style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
+                              borderRadius:3, color:C.inkFaint, fontSize:10,
+                              padding:"2px 8px", cursor:"pointer", fontFamily:"inherit" }}>Edit</button>
+                          <button onClick={() => onUpdate({ ...domain, calls: calls.filter(x => x.id!==cl.id) })}
+                            style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
+                              borderRadius:3, color:C.red, fontSize:10, padding:"2px 8px",
+                              cursor:"pointer", fontFamily:"inherit" }}>Delete</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {editingNoteId === cl.id ? (
+                    <div style={{ border:`1px solid ${domain.color}44`,
+                      borderRadius:6, overflow:"hidden" }}>
+                      {/* Rich text toolbar for edit mode */}
+                      <div style={{ display:"flex", gap:2, padding:"6px 10px",
+                        borderBottom:`1px solid ${C.border}`, flexWrap:"wrap" }}>
+                        {[
+                          { cmd:"bold",      icon:"B", style:{ fontWeight:700 } },
+                          { cmd:"italic",    icon:"I", style:{ fontStyle:"italic" } },
+                          { cmd:"underline", icon:"U", style:{ textDecoration:"underline" } },
+                        ].map(({ cmd, icon, style:s }) => (
+                          <button key={cmd}
+                            onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
+                            style={{ background:"transparent", border:`1px solid ${C.border}`,
+                              borderRadius:3, width:26, height:24, cursor:"pointer",
+                              fontSize:12, color:C.inkMid, ...s }}>{icon}</button>
+                        ))}
+                        <div style={{ width:1, background:C.border, margin:"0 4px" }} />
+                        {[
+                          { cmd:"insertUnorderedList", icon:"• —" },
+                          { cmd:"insertOrderedList",   icon:"1." },
+                          { cmd:"indent",              icon:"→" },
+                          { cmd:"outdent",             icon:"←" },
+                        ].map(({ cmd, icon }) => (
+                          <button key={cmd}
+                            onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
+                            style={{ background:"transparent", border:`1px solid ${C.border}`,
+                              borderRadius:3, padding:"0 7px", height:24, cursor:"pointer",
+                              fontSize:11, color:C.inkMid, fontFamily:"'Courier New', monospace" }}>{icon}</button>
+                        ))}
+                      </div>
+                      <div
+                        ref={editNoteRef}
+                        dir="ltr"
+                        contentEditable
+                        suppressContentEditableWarning
+                        dangerouslySetInnerHTML={{ __html: cl.notes }}
+                        style={{ padding:12, minHeight:100, color:C.ink,
+                          fontSize:14, fontFamily:"Georgia, serif", lineHeight:1.8,
+                          outline:"none", direction:"ltr", textAlign:"left",
+                          whiteSpace:"pre-wrap", wordBreak:"break-word" }}
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      dangerouslySetInnerHTML={{ __html: cl.notes }}
+                      style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif",
+                        lineHeight:1.8 }}
+                    />
+                  )}
                 </div>
               ))}
             </div>
@@ -1765,16 +1890,24 @@ function WorkDomainView({ domain, onUpdate }) {
   };
 
   // ── AI SUMMARIZE ─────────────────────────────────────────────────────────
-  const generateSummary = async (contactId) => {
+  const generateSummaryFromCalls = async (contactId, freshCalls) => {
     setSummarizing(contactId);
-    const contact = contacts.find(c => c.id === contactId);
-    // Read current calls from domain directly to avoid stale closure
-    const contactCalls = (domain.calls || []).filter(cl => cl.contactId === contactId);
+    const contact = (domain.contacts||[]).find(c => c.id === contactId);
+    const contactCalls = (freshCalls || calls).filter(cl => cl.contactId === contactId);
     if (contactCalls.length === 0) { setSummarizing(null); return; }
+
+    // Strip HTML tags for plain text
+    const stripHtml = (html) => {
+      try {
+        const tmp = document.createElement("div");
+        tmp.innerHTML = html;
+        return tmp.innerText || tmp.textContent || html;
+      } catch { return html; }
+    };
 
     const notesBlock = [...contactCalls]
       .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .map(cl => `[${cl.date}]\n${cl.notes}`)
+      .map(cl => `[${cl.date}]\n${stripHtml(cl.notes)}`)
       .join("\n\n---\n\n");
 
     try {
@@ -1800,7 +1933,6 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
       const data = await res.json();
       const summary = data.content?.find(b => b.type === "text")?.text || "";
       if (!summary) { setSummarizing(null); return; }
-      // Store summary on contact record (cleaner than on every call)
       onUpdate({
         ...domain,
         contacts: (domain.contacts||[]).map(c =>
@@ -1812,6 +1944,9 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
     }
     setSummarizing(null);
   };
+
+  // Keep old name as alias for button clicks
+  const generateSummary = (contactId) => generateSummaryFromCalls(contactId, null);
 
 
   return (
@@ -2189,7 +2324,8 @@ function CalendarView({ domains }) {
   // ── Screenshot import ─────────────────────────────────────────────────────
   const importFromScreenshot = async (file) => {
     setImporting(true);
-    setImportMsg("Reading your calendar screenshot…");
+    const isPDF = file.type === "application/pdf";
+    setImportMsg(`Reading your calendar ${isPDF ? "PDF" : "screenshot"}…`);
     try {
       const base64 = await new Promise((res, rej) => {
         const r = new FileReader();
@@ -2197,6 +2333,14 @@ function CalendarView({ domains }) {
         r.onerror = rej;
         r.readAsDataURL(file);
       });
+
+      const contentBlock = isPDF ? {
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: base64 }
+      } : {
+        type: "image",
+        source: { type: "base64", media_type: file.type || "image/png", data: base64 }
+      };
 
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -2207,13 +2351,10 @@ function CalendarView({ domains }) {
           messages: [{
             role: "user",
             content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: file.type || "image/png", data: base64 }
-              },
+              contentBlock,
               {
                 type: "text",
-                text: `This is a screenshot of a calendar (likely Outlook or similar). Extract all visible meetings/events.
+                text: `This is a ${isPDF ? "PDF print" : "screenshot"} of a calendar (likely Outlook or similar). Extract all visible meetings/events.
 
 For each meeting return JSON with this exact structure:
 {
@@ -2227,7 +2368,7 @@ For each meeting return JSON with this exact structure:
   ]
 }
 
-Only return the JSON, nothing else. Use 24-hour time format. If you cannot determine exact times, make a reasonable estimate from the visual position. Only include meetings visible in the screenshot.`
+Only return the JSON, nothing else. Use 24-hour time format. If you cannot determine exact times, estimate from visual position. Only include meetings visible in the file.`
               }
             ]
           }]
@@ -2241,12 +2382,11 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
       const meetings = parsed.meetings || [];
 
       if (!meetings.length) {
-        setImportMsg("No meetings found in screenshot.");
+        setImportMsg("No meetings found — try a clearer file.");
         setImporting(false);
         return;
       }
 
-      // Convert meetings to calendar blocks
       const newBlocks = meetings.map((m, i) => {
         const dayIdx = DAYS.indexOf(m.day);
         if (dayIdx === -1) return null;
@@ -2265,14 +2405,16 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
         };
       }).filter(Boolean);
 
-      const updated = [...blocks.filter(b => b.weekKey !== weekKey || !b.id.startsWith("import-")),
+      const updated = [
+        ...blocks.filter(b => b.weekKey !== weekKey || !b.id.startsWith("import-")),
         ...weekBlocks.filter(b => !b.id.startsWith("import-")),
-        ...newBlocks];
+        ...newBlocks
+      ];
       saveBlocks(updated);
-      setImportMsg(`Imported ${newBlocks.length} meeting${newBlocks.length !== 1 ? "s" : ""}. Now tap "Schedule todos" to fill the gaps.`);
+      setImportMsg(`Imported ${newBlocks.length} meeting${newBlocks.length !== 1 ? "s" : ""}. Tap "Schedule todos around meetings" to fill the gaps.`);
     } catch(e) {
       console.error("Import failed:", e);
-      setImportMsg("Import failed — try a clearer screenshot.");
+      setImportMsg("Import failed — try a clearer file.");
     }
     setImporting(false);
   };
@@ -2402,9 +2544,9 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
             color: importing ? C.inkFaint : C.caqi, fontSize:12,
             padding:"8px 12px", cursor: importing ? "default" : "pointer",
             fontFamily:"Georgia, serif", fontStyle:"italic" }}>
-          {importing ? "Reading…" : "📷 Import from screenshot"}
+          {importing ? "Reading…" : "📷 Import from screenshot or PDF"}
         </button>
-        <input ref={fileInputRef} type="file" accept="image/*"
+        <input ref={fileInputRef} type="file" accept="image/*,application/pdf"
           style={{ display:"none" }}
           onChange={e => { if (e.target.files?.[0]) importFromScreenshot(e.target.files[0]); }} />
       </div>
