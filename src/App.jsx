@@ -51,7 +51,10 @@ async function deleteFromDb(table, id) {
 // Save entire domain state to Supabase
 async function saveDomainToDb(domain) {
   try {
-    await (await supa.from("domains")).upsert({ id: domain.id, rating: domain.rating });
+    await (await supa.from("domains")).upsert({
+      id: domain.id, rating: domain.rating,
+      crm_stages: domain.crmStages || null
+    });
 
     if (domain.goals?.length) {
       await (await supa.from("goals")).upsert(domain.goals.map(g => ({
@@ -155,7 +158,10 @@ async function loadFromDb() {
       const dbActivities = Array.isArray(activitiesDb) ? activitiesDb.filter(x => x.domain_id === d.id) : [];
 
       const merged = { ...d };
-      if (dbDomain) merged.rating = dbDomain.rating;
+      if (dbDomain) {
+        merged.rating = dbDomain.rating;
+        if (dbDomain.crm_stages) merged.crmStages = dbDomain.crm_stages;
+      }
       if (dbGoals.length) merged.goals = dbGoals.map(g => ({
         id: g.id, text: g.text, quarter: g.quarter,
         progress: g.progress, pillar: g.pillar,
@@ -964,7 +970,7 @@ function ActivitiesSection({ activities, color, colorLight, pillars, onUpdate })
 // ── WORK DOMAIN VIEW ──────────────────────────────────────────────────────────
 const HORIZONS   = ["today", "this week", "someday"];
 const PRIORITIES = ["high", "med", "low"];
-const CRM_STAGES = ["prospect", "investor", "portfolio", "advisor", "team"];
+const CRM_STAGES_DEFAULT = ["prospect", "investor", "portfolio", "advisor", "team"];
 const PROJECTS   = ["Maro","Immersiv","Bloomwell","OSI","Wellnest","Calibright","Portoro","DCG"];
 const PRI_COLOR  = { high: C.red, med: C.gold, low: C.inkFaint };
 const STAGE_COLOR = { prospect: "#b87a2a", investor: "#3d6ea8", portfolio: "#4e9e8e", advisor: "#7a5aaa", team: "#3a8a5a" };
@@ -995,7 +1001,12 @@ function WorkDomainView({ domain, onUpdate }) {
   const [addingTodo, setAddingTodo] = useState(false);
   const [editingTodo, setEditingTodo] = useState(null); // id of todo being edited
   const [crmFilter, setCrmFilter] = useState("all");
-  const [crmSearch, setCrmSearch] = useState("");
+  const crmSearchValue = useRef("");
+  const [crmSearchTick, setCrmSearchTick] = useState(0);
+  const [editingStages, setEditingStages] = useState(false);
+  const [newStageName, setNewStageName] = useState("");
+  const CRM_STAGES = domain.crmStages || CRM_STAGES_DEFAULT;
+  const setCrmStages = (stages) => onUpdate({ ...domain, crmStages: stages });
   const [selectedContact, setSelectedContact] = useState(null);
   const [editingContact, setEditingContact] = useState(null);
   const [newContact, setNewContact] = useState({ name:"", company:"", role:"", stage:"prospect", lastContact:"", email:"", phone:"", linkedin:"", personal:"", notes:"" });
@@ -1022,7 +1033,7 @@ function WorkDomainView({ domain, onUpdate }) {
   const contactName = (id) => contacts.find(c => c.id === id)?.name || "—";
 
   const WORK_TABS = [
-    { id: "todos", label: "Todos" },
+    { id: "todos", label: "ToDos" },
     { id: "crm",   label: "People" },
   ];
 
@@ -1175,7 +1186,7 @@ function WorkDomainView({ domain, onUpdate }) {
                 padding:"11px 0",borderBottom:`1px solid ${C.border}`}}>
 
                 {/* Checkbox */}
-                <div onClick={() => setTodos(todos.map(x => x.id===t.id?{...x,done:true}:x))}
+                <div onClick={() => setTodos(todos.map(x => x.id===t.id?{...x,done:true,doneAt:new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"})}:x))}
                   style={{width:17,height:17,borderRadius:3,flexShrink:0,marginTop:2,
                     border:`2px solid ${C.borderMid}`,background:"transparent",cursor:"pointer"}} />
 
@@ -1225,13 +1236,40 @@ function WorkDomainView({ domain, onUpdate }) {
         {/* Add new */}
         {addingTodo ? (
           <div style={{marginTop:12,padding:"12px 0",borderTop:`1px solid ${C.border}`}}>
-            <input value={newTodo.text} onChange={e => setNewTodo({...newTodo,text:e.target.value})}
-              placeholder="What needs doing?" autoFocus
-              onKeyDown={e => { if (e.key==="Escape") setAddingTodo(false); }}
-              style={{width:"100%",background:"transparent",border:"none",
-                borderBottom:`1px solid ${domain.color}`,color:C.ink,fontSize:14,
-                fontFamily:"Georgia, serif",fontStyle:"italic",
-                padding:"4px 0",outline:"none",boxSizing:"border-box",marginBottom:12}} />
+            {/* Autocomplete suggestion derived from existing todos */}
+            {(() => {
+              const suggestion = newTodo.text.length >= 2
+                ? todos.find(t => t.text.toLowerCase().startsWith(newTodo.text.toLowerCase()) && t.text !== newTodo.text)?.text || ""
+                : "";
+              const ghostText = suggestion ? suggestion.slice(newTodo.text.length) : "";
+              return (
+                <div style={{ position:"relative", marginBottom:12 }}>
+                  <input
+                    dir="ltr"
+                    value={newTodo.text}
+                    onChange={e => setNewTodo({...newTodo, text:e.target.value})}
+                    placeholder="What needs doing?"
+                    autoFocus
+                    onKeyDown={e => {
+                      if ((e.key === "Tab" || e.key === "ArrowRight") && suggestion) {
+                        e.preventDefault();
+                        setNewTodo({...newTodo, text: suggestion});
+                      }
+                      if (e.key === "Escape") setAddingTodo(false);
+                    }}
+                    style={{width:"100%",background:"transparent",border:"none",
+                      borderBottom:`1px solid ${domain.color}`,color:C.ink,fontSize:14,
+                      fontFamily:"Georgia, serif",fontStyle:"italic",
+                      padding:"4px 0",outline:"none",boxSizing:"border-box"}} />
+                  {suggestion && (
+                    <div style={{ fontSize:10, color:C.inkFaint,
+                      fontFamily:"'Courier New', monospace", marginTop:4 }}>
+                      Tab → <span style={{ color:C.caqi }}>{suggestion}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New', monospace",
               textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Time needed</div>
@@ -1286,7 +1324,8 @@ function WorkDomainView({ domain, onUpdate }) {
                   color:C.inkFaint,fontSize:12,padding:"6px 10px",cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
             </div>
           </div>
-        ) : (
+        ) : null }
+        {!addingTodo && (
           <button onClick={() => { setAddingTodo(true); setNewTodo(n => ({...n,horizon:todoHorizon})); }}
             style={{width:"100%",background:"transparent",border:`1px dashed ${C.borderMid}`,
               borderRadius:6,padding:"9px",color:C.inkFaint,fontSize:12,cursor:"pointer",
@@ -1311,6 +1350,10 @@ function WorkDomainView({ domain, onUpdate }) {
                   <span onClick={() => setEditingTodo(t.id)}
                     style={{fontSize:13,color:C.inkMid,textDecoration:"line-through",
                       fontFamily:"Georgia, serif",flex:1,cursor:"text"}}>{t.text}</span>
+                  {t.doneAt && (
+                    <span style={{fontSize:9,color:C.inkFaint,fontFamily:"'Courier New', monospace",
+                      flexShrink:0,whiteSpace:"nowrap"}}>{t.doneAt}</span>
+                  )}
                   <button onClick={() => setTodos(todos.filter(x => x.id!==t.id))}
                     style={{background:"transparent",border:"none",color:C.inkFaint,
                       cursor:"pointer",fontSize:12,padding:0}}>×</button>
@@ -1503,7 +1546,7 @@ function WorkDomainView({ domain, onUpdate }) {
               {todos.filter(t => t.contactId===contact.id && !t.done).map(t => (
                 <div key={t.id} style={{ display:"flex", gap:8, alignItems:"flex-start",
                   padding:"7px 0", borderBottom:`1px solid ${C.border}` }}>
-                  <div onClick={() => setTodos(todos.map(x => x.id===t.id?{...x,done:true}:x))}
+                  <div onClick={() => setTodos(todos.map(x => x.id===t.id?{...x,done:true,doneAt:new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"})}:x))}
                     style={{ width:15, height:15, borderRadius:3, flexShrink:0, marginTop:2,
                       border:`2px solid ${C.borderMid}`, background:"transparent", cursor:"pointer" }} />
                   <span style={{ fontSize:13, color:C.inkMid, fontFamily:"Georgia, serif",
@@ -1775,11 +1818,10 @@ function WorkDomainView({ domain, onUpdate }) {
         <div style={{ marginBottom:12 }}>
           <input
             dir="ltr"
-            defaultValue={crmSearch}
             onChange={e => {
-              const v = e.target.value;
+              crmSearchValue.current = e.target.value;
               if (crmSearchTimer.current) clearTimeout(crmSearchTimer.current);
-              crmSearchTimer.current = setTimeout(() => setCrmSearch(v), 350);
+              crmSearchTimer.current = setTimeout(() => setCrmSearchTick(t => t+1), 350);
             }}
             placeholder="Search by name or company…"
             style={{ width:"100%", background:C.surface,
@@ -1790,7 +1832,7 @@ function WorkDomainView({ domain, onUpdate }) {
         </div>
 
         {/* Stage filters */}
-        <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:14 }}>
+        <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:6 }}>
           {["all", ...CRM_STAGES].map(s => (
             <button key={s} onClick={() => setCrmFilter(s)}
               style={{ background: crmFilter===s ? (STAGE_COLOR[s]||domain.color) : "transparent",
@@ -1800,13 +1842,67 @@ function WorkDomainView({ domain, onUpdate }) {
                 fontFamily:"'Courier New', monospace", textTransform:"capitalize",
                 transition:"all 0.12s" }}>{s}</button>
           ))}
+          <button onClick={() => setEditingStages(e => !e)}
+            style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
+              borderRadius:20, padding:"3px 10px", fontSize:10, cursor:"pointer",
+              color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+            {editingStages ? "done" : "✎ labels"}
+          </button>
         </div>
+
+        {/* Stage editor */}
+        {editingStages && (
+          <div style={{ background:C.surface, border:`1px solid ${C.border}`,
+            borderRadius:6, padding:12, marginBottom:12 }}>
+            <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+              textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>Edit labels</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:10 }}>
+              {CRM_STAGES.map((s, i) => (
+                <div key={s} style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <div style={{ width:8, height:8, borderRadius:"50%", flexShrink:0,
+                    background: STAGE_COLOR[s] || domain.color }} />
+                  <span style={{ flex:1, fontSize:13, color:C.ink,
+                    fontFamily:"'Courier New', monospace" }}>{s}</span>
+                  <button onClick={() => {
+                    const updated = CRM_STAGES.filter((_, j) => j !== i);
+                    setCrmStages(updated);
+                    if (crmFilter === s) setCrmFilter("all");
+                  }} style={{ background:"transparent", border:"none", color:C.red,
+                    cursor:"pointer", fontSize:14, padding:0, lineHeight:1 }}>×</button>
+                </div>
+              ))}
+            </div>
+            {/* Add new stage */}
+            <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+              <input dir="ltr" value={newStageName}
+                onChange={e => setNewStageName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && newStageName.trim()) {
+                    setCrmStages([...CRM_STAGES, newStageName.trim().toLowerCase()]);
+                    setNewStageName("");
+                  }
+                }}
+                placeholder="New label…"
+                style={{ flex:1, background:"transparent", border:"none",
+                  borderBottom:`1px solid ${domain.color}`, color:C.ink,
+                  fontSize:13, fontFamily:"'Courier New', monospace",
+                  padding:"3px 0", outline:"none" }} />
+              <button onClick={() => {
+                if (!newStageName.trim()) return;
+                setCrmStages([...CRM_STAGES, newStageName.trim().toLowerCase()]);
+                setNewStageName("");
+              }} style={{ background:domain.color, border:"none", borderRadius:4,
+                color:"#fff", fontSize:11, padding:"4px 12px",
+                cursor:"pointer", fontFamily:"inherit" }}>Add</button>
+            </div>
+          </div>
+        )}
 
         {/* Contact list — warmth dots from last contact */}
         <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
           {filtered
-            .filter(c => !crmSearch || c.name.toLowerCase().includes(crmSearch.toLowerCase()) ||
-              c.company.toLowerCase().includes(crmSearch.toLowerCase()))
+            .filter(c => !crmSearchValue.current || c.name.toLowerCase().includes(crmSearchValue.current.toLowerCase()) ||
+              (c.company||"").toLowerCase().includes(crmSearchValue.current.toLowerCase()))
             .map(c => {
             const w = contactWarmth(c.lastContact);
             const cNotes = calls.filter(cl => cl.contactId===c.id);
@@ -1952,19 +2048,22 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
   return (
     <div>
       <Header />
-      {/* Tabs */}
-      <div style={{ display:"flex", borderBottom:`1px solid ${C.border}`, marginBottom:0 }}>
+      {/* Tabs — pill style */}
+      <div style={{ display:"flex", gap:8, marginBottom:14,
+        background:C.surface, borderRadius:8, padding:4,
+        border:`1px solid ${C.border}` }}>
         {WORK_TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
-            flex:1, background:"transparent", border:"none",
-            borderBottom:`2px solid ${tab===t.id ? domain.color : "transparent"}`,
-            color: tab===t.id ? domain.color : C.inkFaint,
-            padding:"10px 4px", fontSize:11, cursor:"pointer",
+            flex:1, border:"none", borderRadius:6,
+            background: tab===t.id ? domain.color : "transparent",
+            color: tab===t.id ? "#fff" : C.inkFaint,
+            padding:"8px 4px", fontSize:12, cursor:"pointer",
             fontFamily:"Georgia, serif", fontStyle:"italic",
-            transition:"all 0.12s", marginBottom:-1 }}>{t.label}</button>
+            fontWeight: tab===t.id ? 600 : 400,
+            boxShadow: tab===t.id ? `0 1px 4px ${domain.color}44` : "none",
+            transition:"all 0.15s" }}>{t.label}</button>
         ))}
       </div>
-      <div style={{ paddingTop:12 }}>
         {tab === "todos" && <TodosTab />}
         {tab === "crm"   && <CRMTab />}
       </div>
