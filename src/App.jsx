@@ -2059,6 +2059,7 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
             transition:"all 0.15s" }}>{t.label}</button>
         ))}
       </div>
+      <div style={{ paddingTop:12 }}>
         {tab === "todos" && <TodosTab />}
         {tab === "crm"   && <CRMTab />}
       </div>
