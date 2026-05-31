@@ -1234,42 +1234,37 @@ function WorkDomainView({ domain, onUpdate }) {
         </div>
 
         {/* Add new */}
-        {addingTodo ? (
+        {addingTodo ? (() => {
+          const suggestion = newTodo.text.length >= 2
+            ? (todos.find(t => t.text.toLowerCase().startsWith(newTodo.text.toLowerCase()) && t.text !== newTodo.text)?.text || "")
+            : "";
+          return (
           <div style={{marginTop:12,padding:"12px 0",borderTop:`1px solid ${C.border}`}}>
-            {/* Autocomplete suggestion derived from existing todos */}
-            {(() => {
-              const suggestion = newTodo.text.length >= 2
-                ? todos.find(t => t.text.toLowerCase().startsWith(newTodo.text.toLowerCase()) && t.text !== newTodo.text)?.text || ""
-                : "";
-              const ghostText = suggestion ? suggestion.slice(newTodo.text.length) : "";
-              return (
-                <div style={{ position:"relative", marginBottom:12 }}>
-                  <input
-                    dir="ltr"
-                    value={newTodo.text}
-                    onChange={e => setNewTodo({...newTodo, text:e.target.value})}
-                    placeholder="What needs doing?"
-                    autoFocus
-                    onKeyDown={e => {
-                      if ((e.key === "Tab" || e.key === "ArrowRight") && suggestion) {
-                        e.preventDefault();
-                        setNewTodo({...newTodo, text: suggestion});
-                      }
-                      if (e.key === "Escape") setAddingTodo(false);
-                    }}
-                    style={{width:"100%",background:"transparent",border:"none",
-                      borderBottom:`1px solid ${domain.color}`,color:C.ink,fontSize:14,
-                      fontFamily:"Georgia, serif",fontStyle:"italic",
-                      padding:"4px 0",outline:"none",boxSizing:"border-box"}} />
-                  {suggestion && (
-                    <div style={{ fontSize:10, color:C.inkFaint,
-                      fontFamily:"'Courier New', monospace", marginTop:4 }}>
-                      Tab → <span style={{ color:C.caqi }}>{suggestion}</span>
-                    </div>
-                  )}
+            <div style={{ position:"relative", marginBottom:12 }}>
+              <input
+                dir="ltr"
+                value={newTodo.text}
+                onChange={e => setNewTodo({...newTodo, text:e.target.value})}
+                placeholder="What needs doing?"
+                autoFocus
+                onKeyDown={e => {
+                  if ((e.key === "Tab" || e.key === "ArrowRight") && suggestion) {
+                    e.preventDefault();
+                    setNewTodo({...newTodo, text: suggestion});
+                  }
+                  if (e.key === "Escape") setAddingTodo(false);
+                }}
+                style={{width:"100%",background:"transparent",border:"none",
+                  borderBottom:`1px solid ${domain.color}`,color:C.ink,fontSize:14,
+                  fontFamily:"Georgia, serif",fontStyle:"italic",
+                  padding:"4px 0",outline:"none",boxSizing:"border-box"}} />
+              {suggestion && (
+                <div style={{ fontSize:10, color:C.inkFaint,
+                  fontFamily:"'Courier New', monospace", marginTop:4 }}>
+                  Tab → <span style={{ color:C.caqi }}>{suggestion}</span>
                 </div>
-              );
-            })()}
+              )}
+            </div>
 
             <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New', monospace",
               textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Time needed</div>
@@ -1324,7 +1319,7 @@ function WorkDomainView({ domain, onUpdate }) {
                   color:C.inkFaint,fontSize:12,padding:"6px 10px",cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
             </div>
           </div>
-        ) : null }
+        );})() : null }
         {!addingTodo && (
           <button onClick={() => { setAddingTodo(true); setNewTodo(n => ({...n,horizon:todoHorizon})); }}
             style={{width:"100%",background:"transparent",border:`1px dashed ${C.borderMid}`,
