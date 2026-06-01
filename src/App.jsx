@@ -1155,6 +1155,55 @@ function noteKeyHandler(e) {
   }
 }
 
+function GranolaPanel({ meetings, loading, importing, onSelect, onClose }) {
+  return (
+    <div style={{ background:C.surface, border:`1.5px solid #4ade80`,
+      borderRadius:8, padding:12, marginBottom:12 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:14 }}>🌿</span>
+          <span style={{ fontSize:12, color:"#16a34a", fontFamily:"'Courier New', monospace",
+            textTransform:"uppercase", letterSpacing:"0.08em" }}>Granola meetings</span>
+        </div>
+        <button onClick={onClose}
+          style={{ background:"transparent", border:"none", color:C.inkFaint,
+            cursor:"pointer", fontSize:14, padding:0 }}>×</button>
+      </div>
+      {loading && (
+        <div style={{ fontSize:12, color:C.inkFaint, fontStyle:"italic", padding:"8px 0" }}>
+          Loading your Granola meetings…
+        </div>
+      )}
+      {!loading && meetings.length === 0 && (
+        <div style={{ fontSize:12, color:C.inkFaint, fontStyle:"italic", padding:"8px 0" }}>
+          No recent meetings found in Granola.
+        </div>
+      )}
+      {!loading && meetings.map(m => (
+        <div key={m.id} style={{ display:"flex", alignItems:"center", gap:10,
+          padding:"9px 0", borderBottom:`1px solid ${C.border}` }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:13, color:C.ink, fontFamily:"Georgia, serif",
+              fontWeight:500, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.title}</div>
+            {m.date && <div style={{ fontSize:10, color:C.inkFaint,
+              fontFamily:"'Courier New', monospace", marginTop:2 }}>{m.date}</div>}
+            {m.attendees && <div style={{ fontSize:10, color:C.inkFaint,
+              fontStyle:"italic", marginTop:1 }}>{m.attendees}</div>}
+          </div>
+          <button onClick={() => onSelect(m)}
+            disabled={!!importing}
+            style={{ background: importing===m.id ? C.border : "#16a34a",
+              border:"none", borderRadius:4, color:"#fff", fontSize:11,
+              padding:"4px 12px", cursor: importing ? "default" : "pointer",
+              fontFamily:"inherit", fontWeight:600, flexShrink:0, opacity: importing && importing!==m.id ? 0.5 : 1 }}>
+            {importing===m.id ? "Importing…" : "Import"}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function FollowUpInput({ onAdd, accentColor }) {
   const [val, setVal] = useState("");
   const color = accentColor || C.gold;
@@ -1398,6 +1447,10 @@ function WorkDomainView({ domain, onUpdate }) {
   const [selectedProject, setSelectedProject] = useState(null);
   const [addingProject, setAddingProject]     = useState(false);
   const [projectNoteText, setProjectNoteText] = useState("");
+  const [granolaOpen, setGranolaOpen]         = useState(false);  // "contact" | "project" | null
+  const [granolaMeetings, setGranolaMeetings] = useState([]);
+  const [granolaLoading, setGranolaLoading]   = useState(false);
+  const [granolaImporting, setGranolaImporting] = useState(null); // meeting id being imported
 
   const todos    = domain.todos    || [];
   const contacts = domain.contacts || [];
@@ -1870,6 +1923,10 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                   style={{ background:"transparent", border:`1.5px solid ${C.red}`,
                     borderRadius:4, color:C.red, fontSize:11, padding:"5px 10px",
                     cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic" }}>🎙 record</button>
+                <button onClick={() => granolaOpen==="contact" ? setGranolaOpen(null) : openGranola("contact")}
+                  style={{ background:"transparent", border:`1.5px solid #16a34a`,
+                    borderRadius:4, color:"#16a34a", fontSize:11, padding:"5px 10px",
+                    cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic" }}>🌿 Granola</button>
               </div>
             )}
           </div>
@@ -2065,6 +2122,21 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                 </div>
               )}
             </div>
+          )}
+          {/* Granola import panel */}
+          {granolaOpen === "contact" && (
+            <GranolaPanel
+              meetings={granolaMeetings}
+              loading={granolaLoading}
+              importing={granolaImporting}
+              onClose={() => setGranolaOpen(null)}
+              onSelect={(m) => importGranolaMeeting(m, "contact", (note) => {
+                const updated = [{ ...note, contactId: selectedContact }, ...calls];
+                onUpdate({ ...domain, calls: updated,
+                  contacts: (domain.contacts||[]).map(c =>
+                    c.id===selectedContact ? { ...c, lastContact: note.date } : c) });
+              })}
+            />
           )}
           {isWriting && (
             <div style={{ margin:"14px 0", background:C.surface,
@@ -2530,6 +2602,52 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
   };
 
   // ── AI SUMMARIZE ─────────────────────────────────────────────────────────
+  // ── Granola integration ───────────────────────────────────────────────────
+  const granolaFetch = async (body) => {
+    const res = await fetch("/api/granola", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    return data.result || "";
+  };
+
+  const openGranola = async (context) => {
+    setGranolaOpen(context);
+    setGranolaMeetings([]);
+    setGranolaLoading(true);
+    try {
+      const raw = await granolaFetch({ action:"list", time_range:"last_30_days" });
+      const clean = raw.replace(/```json|```/g,"").trim();
+      const meetings = JSON.parse(clean);
+      setGranolaMeetings(Array.isArray(meetings) ? meetings : []);
+    } catch(e) {
+      console.error("Granola list failed:", e);
+      setGranolaMeetings([]);
+    }
+    setGranolaLoading(false);
+  };
+
+  const importGranolaMeeting = async (meeting, context, updateFn) => {
+    setGranolaImporting(meeting.id);
+    try {
+      const raw = await granolaFetch({ action:"get_meeting", meeting_id: meeting.id });
+      const clean = raw.replace(/```json|```/g,"").trim();
+      const data = JSON.parse(clean);
+      const today = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"});
+      const html = [
+        data.summary ? `<p><strong>Summary:</strong> ${data.summary}</p>` : "",
+        data.notes   ? `<p><strong>Notes:</strong> ${data.notes}</p>`   : "",
+      ].filter(Boolean).join("") || `<p>${raw}</p>`;
+      const note = { id:`cl${Date.now()}`, date: data.date || today, notes: html };
+      updateFn(note);
+    } catch(e) {
+      console.error("Granola import failed:", e);
+    }
+    setGranolaImporting(null);
+    setGranolaOpen(null);
+  };
+
   const generateSummaryFromCalls = async (contactId, freshCalls) => {
     setSummarizing(contactId);
     const contact = (domain.contacts||[]).find(c => c.id === contactId);
@@ -2922,14 +3040,32 @@ Write in first person. Be concise. Plain text only.` }]
         <div style={{ margin:"16px 0" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4 }}>
             <SectionRule label="notes" color={domain.color} />
-            {!projRecording && !projRecordedNotes && (
-              <button onClick={startProjRecording}
-                style={{ background:"transparent", border:`1.5px solid ${C.red}`,
-                  borderRadius:4, color:C.red, fontSize:11, padding:"3px 10px",
-                  cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic",
-                  flexShrink:0, marginBottom:8 }}>🎙 record</button>
-            )}
+            <div style={{ display:"flex", gap:6, flexShrink:0, marginBottom:8 }}>
+              {!projRecording && !projRecordedNotes && (
+                <button onClick={startProjRecording}
+                  style={{ background:"transparent", border:`1.5px solid ${C.red}`,
+                    borderRadius:4, color:C.red, fontSize:11, padding:"3px 10px",
+                    cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic" }}>🎙 record</button>
+              )}
+              <button onClick={() => granolaOpen==="project" ? setGranolaOpen(null) : openGranola("project")}
+                style={{ background:"transparent", border:`1.5px solid #16a34a`,
+                  borderRadius:4, color:"#16a34a", fontSize:11, padding:"3px 10px",
+                  cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic" }}>🌿 Granola</button>
+            </div>
           </div>
+
+          {/* Granola import panel for project */}
+          {granolaOpen === "project" && (
+            <GranolaPanel
+              meetings={granolaMeetings}
+              loading={granolaLoading}
+              importing={granolaImporting}
+              onClose={() => setGranolaOpen(null)}
+              onSelect={(m) => importGranolaMeeting(m, "project", (note) => {
+                updateProject("notes", [...(project.notes||[]), { id:`pn${Date.now()}`, html: note.notes, date: note.date }]);
+              })}
+            />
+          )}
 
           {/* Recording UI */}
           {(projRecording || projGenerating || projRecordedNotes) && (
