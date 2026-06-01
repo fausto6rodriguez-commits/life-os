@@ -2386,10 +2386,15 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
     const project = selectedProject ? projects.find(p => p.id === selectedProject) : null;
     const projNoteRef = useRef(null);
     const fileInputRef = useRef(null);
+    const projRecognitionRef = useRef(null);
     const [addingMilestone, setAddingMilestone] = useState(false);
     const [newMilestone, setNewMilestone] = useState({ text:"", due:"", owner:"" });
     const [addingStatus, setAddingStatus] = useState(false);
     const [newStatus, setNewStatus] = useState("");
+    const [projRecording, setProjRecording] = useState(false);
+    const [projTranscript, setProjTranscript] = useState("");
+    const [projGenerating, setProjGenerating] = useState(false);
+    const [projRecordedNotes, setProjRecordedNotes] = useState("");
     const today = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"});
 
     const updateProject = (field, val) =>
@@ -2401,6 +2406,77 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
       const note = { id:`pn${Date.now()}`, html, date: today };
       updateProject("notes", [...(project.notes||[]), note]);
       if (projNoteRef.current) projNoteRef.current.innerHTML = "";
+    };
+
+    const startProjRecording = () => {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) { alert("Speech recognition not supported. Try Chrome or Safari."); return; }
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+      let final = "";
+      recognition.onresult = (e) => {
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript;
+          if (e.results[i].isFinal) final += t + " ";
+          else interim += t;
+        }
+        setProjTranscript(final + interim);
+      };
+      recognition.onerror = () => setProjRecording(false);
+      recognition.onend = () => setProjRecording(false);
+      projRecognitionRef.current = recognition;
+      recognition.start();
+      setProjRecording(true);
+      setProjTranscript("");
+      setProjRecordedNotes("");
+    };
+
+    const stopProjRecording = async () => {
+      projRecognitionRef.current?.stop();
+      setProjRecording(false);
+      const raw = projTranscript.trim();
+      if (!raw) return;
+      setProjGenerating(true);
+      try {
+        const res = await fetch("/api/claude", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({
+            model:"claude-sonnet-4-20250514", max_tokens:800,
+            messages:[{ role:"user", content:
+              `You are helping an investor take notes about a project meeting or discussion.
+
+Project: ${project?.name}
+Goal: ${project?.goal || ""}
+
+Raw transcript:
+${raw}
+
+Convert into clean structured notes:
+- 2-3 sentences of what was discussed
+- Key points or decisions (bullet list)
+- Any next actions or blockers
+
+Write in first person. Be concise. Plain text only.` }]
+          })
+        });
+        const data = await res.json();
+        setProjRecordedNotes(data.content?.find(b => b.type==="text")?.text || raw);
+      } catch(e) { setProjRecordedNotes(raw); }
+      setProjGenerating(false);
+    };
+
+    const saveProjRecordedNote = () => {
+      if (!projRecordedNotes.trim()) return;
+      const html = projRecordedNotes.split("\n").map(l =>
+        l.startsWith("- ") ? `<li>${l.slice(2)}</li>` : `<p>${l}</p>`
+      ).join("");
+      const note = { id:`pn${Date.now()}`, html, date:today };
+      updateProject("notes", [...(project.notes||[]), note]);
+      setProjRecordedNotes("");
+      setProjTranscript("");
     };
 
     const addFile = (file) => {
@@ -2614,7 +2690,81 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
 
         {/* Notes */}
         <div style={{ margin:"16px 0" }}>
-          <SectionRule label="notes" color={domain.color} />
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4 }}>
+            <SectionRule label="notes" color={domain.color} />
+            {!projRecording && !projRecordedNotes && (
+              <button onClick={startProjRecording}
+                style={{ background:"transparent", border:`1.5px solid ${C.red}`,
+                  borderRadius:4, color:C.red, fontSize:11, padding:"3px 10px",
+                  cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic",
+                  flexShrink:0, marginBottom:8 }}>🎙 record</button>
+            )}
+          </div>
+
+          {/* Recording UI */}
+          {(projRecording || projGenerating || projRecordedNotes) && (
+            <div style={{ marginBottom:12, border:`1.5px solid ${C.red}33`,
+              borderLeft:`3px solid ${C.red}`, borderRadius:6, overflow:"hidden" }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+                padding:"8px 12px", background:`${C.red}08`, borderBottom:`1px solid ${C.red}22` }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  {projRecording && <div style={{ width:8, height:8, borderRadius:"50%",
+                    background:C.red, animation:"pulse 1s infinite" }} />}
+                  <span style={{ fontSize:11, color:C.red, fontFamily:"'Courier New', monospace",
+                    textTransform:"uppercase", letterSpacing:"0.08em" }}>
+                    {projRecording ? "Recording…" : projGenerating ? "Generating notes…" : "Review notes"}
+                  </span>
+                </div>
+                {projRecording ? (
+                  <button onClick={stopProjRecording}
+                    style={{ background:C.red, border:"none", borderRadius:4, color:"#fff",
+                      fontSize:11, padding:"3px 12px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>
+                    Stop + generate
+                  </button>
+                ) : !projGenerating && (
+                  <button onClick={() => { setProjRecordedNotes(""); setProjTranscript(""); }}
+                    style={{ background:"transparent", border:"none", color:C.inkFaint,
+                      cursor:"pointer", fontSize:14, padding:0 }}>×</button>
+                )}
+              </div>
+              {(projRecording || projTranscript) && !projRecordedNotes && (
+                <div style={{ padding:"10px 12px", maxHeight:100, overflowY:"auto" }}>
+                  <div style={{ fontSize:13, color:C.inkMid, fontFamily:"Georgia, serif",
+                    fontStyle:"italic", lineHeight:1.6 }}>
+                    {projTranscript || <span style={{ opacity:0.4 }}>Start speaking…</span>}
+                  </div>
+                </div>
+              )}
+              {projGenerating && (
+                <div style={{ padding:"12px", fontSize:12, color:C.inkFaint, fontStyle:"italic" }}>
+                  Claude is reading the transcript…
+                </div>
+              )}
+              {projRecordedNotes && !projGenerating && (
+                <div style={{ padding:"10px 12px" }}>
+                  <textarea dir="ltr" value={projRecordedNotes}
+                    onChange={e => setProjRecordedNotes(e.target.value)}
+                    style={{ width:"100%", background:"transparent", border:"none",
+                      color:C.ink, fontSize:13, fontFamily:"Georgia, serif", fontStyle:"italic",
+                      lineHeight:1.7, padding:0, outline:"none", resize:"none",
+                      boxSizing:"border-box", direction:"ltr", textAlign:"left",
+                      unicodeBidi:"plaintext", minHeight:100 }} rows={5} />
+                  <div style={{ display:"flex", justifyContent:"flex-end", gap:8,
+                    borderTop:`1px solid ${C.border}`, paddingTop:8, marginTop:6 }}>
+                    <button onClick={() => { setProjRecordedNotes(""); setProjTranscript(""); startProjRecording(); }}
+                      style={{ background:"transparent", border:`1px solid ${C.red}`,
+                        borderRadius:4, color:C.red, fontSize:11, padding:"4px 10px",
+                        cursor:"pointer", fontFamily:"inherit" }}>🎙 Again</button>
+                    <button onClick={saveProjRecordedNote}
+                      style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
+                        fontSize:11, padding:"4px 14px", cursor:"pointer",
+                        fontFamily:"inherit", fontWeight:600 }}>Save note</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {(project.notes||[]).map(n => (
             <div key={n.id} style={{ marginBottom:12, paddingBottom:12, borderBottom:`1px solid ${C.border}` }}>
               <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace", marginBottom:4 }}>{n.date}</div>
