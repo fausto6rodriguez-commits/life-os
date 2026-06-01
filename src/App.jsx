@@ -1176,6 +1176,167 @@ function FollowUpInput({ onAdd, accentColor }) {
   );
 }
 
+// ── STABLE FORM COMPONENTS (top-level to prevent remount on parent re-render) ─
+
+function AddContactForm({ onAdd, onCancel, accentColor, crmStages, stageColors }) {
+  const refs = {
+    name: useRef(null), company: useRef(null), role: useRef(null),
+    email: useRef(null), phone: useRef(null), linkedin: useRef(null),
+    personal: useRef(null), notes: useRef(null),
+  };
+  const [stage, setStage] = useState("prospect");
+  const fields = [["name","Name"],["company","Company"],["role","Role"],
+    ["email","Email"],["phone","Phone"],["linkedin","LinkedIn"],
+    ["personal","Personal notes"],["notes","Context"]];
+  return (
+    <div style={{ marginTop:12, borderTop:`1px solid ${C.border}`, paddingTop:14 }}>
+      {fields.map(([k, ph]) => (
+        <input key={k} ref={refs[k]} dir="ltr" defaultValue=""
+          placeholder={ph}
+          style={{ width:"100%", background:"transparent", border:"none",
+            borderBottom:`1px solid ${C.border}`, color:C.ink, fontSize:14,
+            fontFamily:"Georgia, serif", fontStyle:"italic",
+            padding:"6px 0", outline:"none", boxSizing:"border-box", marginBottom:8 }} />
+      ))}
+      <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:10 }}>
+        {(crmStages||[]).map(s => (
+          <button key={s} onClick={() => setStage(s)}
+            style={{ background:stage===s ? (stageColors[s]||accentColor) : "transparent",
+              color:stage===s ? "#fff" : (stageColors[s]||accentColor),
+              border:`1.5px solid ${stageColors[s]||accentColor}`,
+              borderRadius:20, padding:"2px 9px", fontSize:10, cursor:"pointer",
+              fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{s}</button>
+        ))}
+      </div>
+      <div style={{ display:"flex", gap:8 }}>
+        <button onClick={() => {
+          const name = refs.name.current?.value?.trim();
+          if (!name) return;
+          onAdd({
+            name, company: refs.company.current?.value||"",
+            role: refs.role.current?.value||"",
+            email: refs.email.current?.value||"",
+            phone: refs.phone.current?.value||"",
+            linkedin: refs.linkedin.current?.value||"",
+            personal: refs.personal.current?.value||"",
+            notes: refs.notes.current?.value||"",
+            stage,
+          });
+        }} style={{ background:accentColor, border:"none", borderRadius:4, color:"#fff",
+          fontSize:12, padding:"6px 16px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add</button>
+        <button onClick={onCancel}
+          style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
+            color:C.inkFaint, fontSize:12, padding:"6px 10px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function AddMilestoneForm({ onAdd, onCancel, accentColor }) {
+  const textRef = useRef(null);
+  const ownerRef = useRef(null);
+  const [dueRaw, setDueRaw] = useState("");
+  return (
+    <div style={{ padding:"10px 0", borderTop:`1px solid ${C.border}`, display:"flex", flexDirection:"column", gap:8 }}>
+      <input ref={textRef} dir="ltr" defaultValue="" autoFocus placeholder="Milestone…"
+        style={{ background:"transparent", border:"none", borderBottom:`1px solid ${accentColor}`,
+          color:C.ink, fontSize:13, fontFamily:"Georgia, serif", fontStyle:"italic",
+          padding:"3px 0", outline:"none", width:"100%", boxSizing:"border-box" }} />
+      <div style={{ display:"flex", gap:8 }}>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+            textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Due date</div>
+          <input type="date" value={dueRaw} onChange={e => setDueRaw(e.target.value)}
+            style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`,
+              borderRadius:4, color:C.inkMid, fontSize:12,
+              fontFamily:"'Courier New', monospace", padding:"4px 6px", outline:"none" }} />
+        </div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+            textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Owner</div>
+          <input ref={ownerRef} dir="ltr" defaultValue="" placeholder="Name"
+            style={{ width:"100%", background:"transparent", border:"none",
+              borderBottom:`1px solid ${C.border}`, color:C.inkMid, fontSize:12,
+              fontFamily:"'Courier New', monospace", padding:"3px 0", outline:"none" }} />
+        </div>
+      </div>
+      <div style={{ display:"flex", gap:8 }}>
+        <button onClick={() => {
+          const text = textRef.current?.value?.trim();
+          if (!text) return;
+          const due = dueRaw ? new Date(dueRaw).toLocaleDateString("en-US",{month:"short",day:"numeric"}) : "";
+          onAdd({ text, due, dueRaw, owner: ownerRef.current?.value||"" });
+        }} style={{ background:accentColor, border:"none", borderRadius:4, color:"#fff",
+          fontSize:11, padding:"4px 14px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add</button>
+        <button onClick={onCancel}
+          style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
+            color:C.inkFaint, fontSize:11, padding:"4px 10px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function AddProjectForm({ onAdd, onCancel, accentColor, statusColors }) {
+  const nameRef = useRef(null);
+  const [status, setStatus] = useState("active");
+  return (
+    <div style={{ marginTop:12, padding:"12px 0", borderTop:`1px solid ${C.border}` }}>
+      <input ref={nameRef} dir="ltr" defaultValue="" autoFocus placeholder="Project name…"
+        style={{ width:"100%", background:"transparent", border:"none",
+          borderBottom:`1px solid ${accentColor}`, color:C.ink, fontSize:14,
+          fontFamily:"Georgia, serif", fontStyle:"italic",
+          padding:"4px 0", outline:"none", boxSizing:"border-box", marginBottom:10 }} />
+      <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:10 }}>
+        {Object.keys(statusColors).map(s => (
+          <button key={s} onClick={() => setStatus(s)}
+            style={{ background:status===s ? statusColors[s] : "transparent",
+              color:status===s ? "#fff" : statusColors[s],
+              border:`1.5px solid ${statusColors[s]}`,
+              borderRadius:20, padding:"2px 9px", fontSize:10, cursor:"pointer",
+              fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{s}</button>
+        ))}
+      </div>
+      <div style={{ display:"flex", gap:8 }}>
+        <button onClick={() => {
+          const name = nameRef.current?.value?.trim();
+          if (!name) return;
+          onAdd({ name, status });
+        }} style={{ background:accentColor, border:"none", borderRadius:4, color:"#fff",
+          fontSize:12, padding:"6px 16px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add</button>
+        <button onClick={onCancel}
+          style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
+            color:C.inkFaint, fontSize:12, padding:"6px 10px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function AddStatusForm({ onAdd, onCancel, projectName }) {
+  const ref = useRef(null);
+  return (
+    <div style={{ paddingTop:10 }}>
+      <textarea ref={ref} dir="ltr" defaultValue="" autoFocus rows={3}
+        placeholder={`What happened this week on ${projectName}?`}
+        style={{ width:"100%", background:"transparent", border:"none",
+          borderBottom:`1px solid ${C.caqi}`, color:C.ink, fontSize:13,
+          fontFamily:"Georgia, serif", fontStyle:"italic", lineHeight:1.6,
+          padding:"4px 0", outline:"none", resize:"none", boxSizing:"border-box",
+          direction:"ltr", marginBottom:8 }} />
+      <div style={{ display:"flex", gap:8 }}>
+        <button onClick={() => {
+          const text = ref.current?.value?.trim();
+          if (!text) return;
+          onAdd(text);
+        }} style={{ background:C.caqi, border:"none", borderRadius:4, color:"#fff",
+          fontSize:11, padding:"4px 14px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add</button>
+        <button onClick={onCancel}
+          style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
+            color:C.inkFaint, fontSize:11, padding:"4px 10px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 // ── WORK DOMAIN VIEW ──────────────────────────────────────────────────────────
 const HORIZONS   = ["today", "this week", "someday"];
 const PRIORITIES = ["high", "med", "low"];
@@ -1218,7 +1379,6 @@ function WorkDomainView({ domain, onUpdate }) {
   const setCrmStages = (stages) => onUpdate({ ...domain, crmStages: stages });
   const [selectedContact, setSelectedContact] = useState(null);
   const [editingContact, setEditingContact] = useState(null);
-  const [newContact, setNewContact] = useState({ name:"", company:"", role:"", stage:"prospect", lastContact:"", email:"", phone:"", linkedin:"", personal:"", notes:"" });
   const [addingContact, setAddingContact] = useState(false);
   const [selectedCall, setSelectedCall]   = useState(null);
   const [writingCall, setWritingCall]     = useState(null);
@@ -1237,7 +1397,6 @@ function WorkDomainView({ domain, onUpdate }) {
   const [summarizing, setSummarizing]     = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
   const [addingProject, setAddingProject]     = useState(false);
-  const [newProject, setNewProject]           = useState({ name:"", status:"active", description:"" });
   const [projectNoteText, setProjectNoteText] = useState("");
 
   const todos    = domain.todos    || [];
@@ -2283,37 +2442,16 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
 
         {/* Add contact */}
         {addingContact ? (
-          <div style={{ marginTop:12, borderTop:`1px solid ${C.border}`, paddingTop:14 }}>
-            {[["name","Name"],["company","Company"],["role","Role"],["email","Email"],["phone","Phone"],["linkedin","LinkedIn"],["personal","Personal notes"],["notes","Context"]].map(([k,ph]) => (
-              <input key={k} dir="ltr" value={newContact[k]||""} onChange={e => setNewContact({ ...newContact, [k]:e.target.value })}
-                placeholder={ph} style={{ width:"100%", background:"transparent", border:"none",
-                  borderBottom:`1px solid ${C.border}`, color:C.ink, fontSize:14,
-                  fontFamily:"Georgia, serif", fontStyle:"italic",
-                  padding:"6px 0", outline:"none", boxSizing:"border-box", marginBottom:8 }} />
-            ))}
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:10 }}>
-              {CRM_STAGES.map(s => (
-                <button key={s} onClick={() => setNewContact({ ...newContact, stage:s })}
-                  style={{ background: newContact.stage===s ? STAGE_COLOR[s] : "transparent",
-                    color: newContact.stage===s ? "#fff" : STAGE_COLOR[s],
-                    border:`1.5px solid ${STAGE_COLOR[s]}`,
-                    borderRadius:20, padding:"2px 9px", fontSize:10, cursor:"pointer",
-                    fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{s}</button>
-              ))}
-            </div>
-            <div style={{ display:"flex", gap:8 }}>
-              <button onClick={() => {
-                if (!newContact.name.trim()) return;
-                setContacts([...contacts, { ...newContact, id:`c${Date.now()}` }]);
-                setNewContact({ name:"",company:"",role:"",stage:"prospect",lastContact:"",email:"",phone:"",linkedin:"",personal:"",notes:"" });
-                setAddingContact(false);
-              }} style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
-                fontSize:12, padding:"6px 16px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add</button>
-              <button onClick={() => setAddingContact(false)}
-                style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
-                  color:C.inkFaint, fontSize:12, padding:"6px 10px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
-            </div>
-          </div>
+          <AddContactForm
+            accentColor={domain.color}
+            crmStages={CRM_STAGES}
+            stageColors={STAGE_COLOR}
+            onCancel={() => setAddingContact(false)}
+            onAdd={(data) => {
+              setContacts([...contacts, { ...data, id:`c${Date.now()}`, followUps:[], aiSummary:"" }]);
+              setAddingContact(false);
+            }}
+          />
         ) : (
           <button onClick={() => setAddingContact(true)}
             style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
@@ -2394,11 +2532,9 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
     const fileInputRef = useRef(null);
     const projRecognitionRef = useRef(null);
     const [addingMilestone, setAddingMilestone] = useState(false);
-    const [newMilestone, setNewMilestone] = useState({ text:"", due:"", owner:"" });
-    const [editingMilestoneId, setEditingMilestoneId] = useState(null);
+      const [editingMilestoneId, setEditingMilestoneId] = useState(null);
     const [addingStatus, setAddingStatus] = useState(false);
-    const [newStatus, setNewStatus] = useState("");
-    const [projRecording, setProjRecording] = useState(false);
+      const [projRecording, setProjRecording] = useState(false);
     const [projTranscript, setProjTranscript] = useState("");
     const [projGenerating, setProjGenerating] = useState(false);
     const [projRecordedNotes, setProjRecordedNotes] = useState("");
@@ -2656,52 +2792,15 @@ Write in first person. Be concise. Plain text only.` }]
 
           {/* Add milestone */}
           {addingMilestone ? (
-            <div style={{ padding:"10px 0", borderTop:`1px solid ${C.border}`, display:"flex", flexDirection:"column", gap:8 }}>
-              <input dir="ltr" value={newMilestone.text} autoFocus
-                onChange={e => setNewMilestone({...newMilestone, text:e.target.value})}
-                placeholder="Milestone…"
-                style={{ background:"transparent", border:"none", borderBottom:`1px solid ${domain.color}`,
-                  color:C.ink, fontSize:13, fontFamily:"Georgia, serif", fontStyle:"italic",
-                  padding:"3px 0", outline:"none", width:"100%", boxSizing:"border-box" }} />
-              <div style={{ display:"flex", gap:8 }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
-                    textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Due date</div>
-                  <input type="date" value={newMilestone.dueRaw||""}
-                    onChange={e => {
-                      const raw = e.target.value;
-                      const due = raw ? new Date(raw).toLocaleDateString("en-US",{month:"short",day:"numeric"}) : "";
-                      setNewMilestone({...newMilestone, dueRaw:raw, due});
-                    }}
-                    style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`,
-                      borderRadius:4, color:C.inkMid, fontSize:12,
-                      fontFamily:"'Courier New', monospace", padding:"4px 6px", outline:"none" }} />
-                </div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
-                    textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Owner</div>
-                  <input dir="ltr" value={newMilestone.owner}
-                    onChange={e => setNewMilestone({...newMilestone, owner:e.target.value})}
-                    placeholder="Name"
-                    style={{ width:"100%", background:"transparent", border:"none",
-                      borderBottom:`1px solid ${C.border}`, color:C.inkMid, fontSize:12,
-                      fontFamily:"'Courier New', monospace", padding:"3px 0", outline:"none" }} />
-                </div>
-              </div>
-              <div style={{ display:"flex", gap:8 }}>
-                <button onClick={() => {
-                  if (!newMilestone.text.trim()) return;
-                  updateProject("milestones", [...(project.milestones||[]),
-                    { ...newMilestone, id:`m${Date.now()}`, done:false }]);
-                  setNewMilestone({ text:"", due:"", dueRaw:"", owner:"" });
-                  setAddingMilestone(false);
-                }} style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
-                  fontSize:11, padding:"4px 14px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add</button>
-                <button onClick={() => setAddingMilestone(false)}
-                  style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
-                    color:C.inkFaint, fontSize:11, padding:"4px 10px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
-              </div>
-            </div>
+            <AddMilestoneForm
+              accentColor={domain.color}
+              onCancel={() => setAddingMilestone(false)}
+              onAdd={(m) => {
+                updateProject("milestones", [...(project.milestones||[]),
+                  { ...m, id:`m${Date.now()}`, done:false }]);
+                setAddingMilestone(false);
+              }}
+            />
           ) : (
             <button onClick={() => setAddingMilestone(true)}
               style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
@@ -2730,30 +2829,17 @@ Write in first person. Be concise. Plain text only.` }]
             </div>
           ))}
           {addingStatus ? (
-            <div style={{ paddingTop:10 }}>
-              <textarea dir="ltr" value={newStatus} autoFocus rows={3}
-                onChange={e => setNewStatus(e.target.value)}
-                placeholder={`What happened this week on ${project.name}?`}
-                style={{ width:"100%", background:"transparent", border:"none",
-                  borderBottom:`1px solid ${domain.color}`, color:C.ink, fontSize:13,
-                  fontFamily:"Georgia, serif", fontStyle:"italic", lineHeight:1.6,
-                  padding:"4px 0", outline:"none", resize:"none", boxSizing:"border-box",
-                  direction:"ltr", marginBottom:8 }} />
-              <div style={{ display:"flex", gap:8 }}>
-                <button onClick={() => {
-                  if (!newStatus.trim()) return;
-                  updateProject("weeklyStatus", [
-                    { id:`ws${Date.now()}`, date:today, text:newStatus },
-                    ...(project.weeklyStatus||[])
-                  ]);
-                  setNewStatus(""); setAddingStatus(false);
-                }} style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
-                  fontSize:11, padding:"4px 14px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add</button>
-                <button onClick={() => setAddingStatus(false)}
-                  style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
-                    color:C.inkFaint, fontSize:11, padding:"4px 10px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
-              </div>
-            </div>
+            <AddStatusForm
+              projectName={project.name}
+              onCancel={() => setAddingStatus(false)}
+              onAdd={(text) => {
+                updateProject("weeklyStatus", [
+                  { id:`ws${Date.now()}`, date:today, text },
+                  ...(project.weeklyStatus||[])
+                ]);
+                setAddingStatus(false);
+              }}
+            />
           ) : (
             <button onClick={() => setAddingStatus(true)}
               style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
@@ -2969,39 +3055,16 @@ Write in first person. Be concise. Plain text only.` }]
 
         {/* Add project */}
         {addingProject ? (
-          <div style={{ marginTop:12, padding:"12px 0", borderTop:`1px solid ${C.border}` }}>
-            <input dir="ltr" value={newProject.name} autoFocus
-              onChange={e => setNewProject({...newProject, name:e.target.value})}
-              onKeyDown={e => e.key==="Escape" && setAddingProject(false)}
-              placeholder="Project name…"
-              style={{ width:"100%", background:"transparent", border:"none",
-                borderBottom:`1px solid ${domain.color}`, color:C.ink, fontSize:14,
-                fontFamily:"Georgia, serif", fontStyle:"italic",
-                padding:"4px 0", outline:"none", boxSizing:"border-box", marginBottom:10 }} />
-            <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:10 }}>
-              {Object.keys(STATUS_COLORS).map(s => (
-                <button key={s} onClick={() => setNewProject({...newProject, status:s})}
-                  style={{ background:newProject.status===s ? STATUS_COLORS[s] : "transparent",
-                    color:newProject.status===s ? "#fff" : STATUS_COLORS[s],
-                    border:`1.5px solid ${STATUS_COLORS[s]}`,
-                    borderRadius:20, padding:"2px 9px", fontSize:10, cursor:"pointer",
-                    fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{s}</button>
-              ))}
-            </div>
-            <div style={{ display:"flex", gap:8 }}>
-              <button onClick={() => {
-                if (!newProject.name.trim()) return;
-                setProjects([...projects, { ...newProject, id:`p${Date.now()}`,
-                  goal:"", northStar:"", milestones:[], weeklyStatus:[], notes:[], files:[], followUps:[] }]);
-                setNewProject({ name:"", status:"active", description:"" });
-                setAddingProject(false);
-              }} style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
-                fontSize:12, padding:"6px 16px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add</button>
-              <button onClick={() => setAddingProject(false)}
-                style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
-                  color:C.inkFaint, fontSize:12, padding:"6px 10px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
-            </div>
-          </div>
+          <AddProjectForm
+            accentColor={domain.color}
+            statusColors={STATUS_COLORS}
+            onCancel={() => setAddingProject(false)}
+            onAdd={({ name, status }) => {
+              setProjects([...projects, { id:`p${Date.now()}`, name, status,
+                goal:"", northStar:"", milestones:[], weeklyStatus:[], notes:[], files:[], followUps:[] }]);
+              setAddingProject(false);
+            }}
+          />
         ) : (
           <button onClick={() => setAddingProject(true)}
             style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
