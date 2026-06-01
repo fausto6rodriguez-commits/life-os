@@ -448,6 +448,16 @@ const DOMAINS = [
         notes: "Weave sent over a preliminary term sheet for OSI. Valuation is below what we were hoping — about 15% under our internal target. The structure isn't bad but the price needs work. I want to have a board discussion before I respond. Need to understand if there are other interested parties we could use as leverage or if Weave is our best option right now.",
         summary: "" },
     ],
+    projects: [
+      { id:"p1", name:"Maro", status:"active", description:"Strategic sale process. Targeting cybersecurity-focused banks.",
+        notes:[], files:[] },
+      { id:"p2", name:"Immersiv", status:"active", description:"Lender package prep. Infusion clinic profitability model.",
+        notes:[], files:[] },
+      { id:"p3", name:"Bloomwell", status:"active", description:"Series A financing. VBC patient database work.",
+        notes:[], files:[] },
+      { id:"p4", name:"DCG Fund Operations", status:"active", description:"LP communications, carry program, build pod.",
+        notes:[], files:[] },
+    ],
   },
 ];
 
@@ -1106,6 +1116,27 @@ function noteKeyHandler(e) {
   }
 }
 
+function FollowUpInput({ onAdd, accentColor }) {
+  const [val, setVal] = useState("");
+  const color = accentColor || C.gold;
+  const submit = () => { if (val.trim()) { onAdd(val.trim()); setVal(""); } };
+  return (
+    <div style={{ display:"flex", gap:8, alignItems:"center", paddingTop:8 }}>
+      <input dir="ltr" value={val} onChange={e => setVal(e.target.value)}
+        onKeyDown={e => { if (e.key==="Enter") submit(); }}
+        placeholder="Add follow-up…"
+        style={{ flex:1, background:"transparent", border:"none",
+          borderBottom:`1px solid ${color}55`, color:C.ink, fontSize:13,
+          fontFamily:"Georgia, serif", fontStyle:"italic",
+          padding:"3px 0", outline:"none", direction:"ltr" }} />
+      <button onClick={submit}
+        style={{ background:"transparent", border:`1px solid ${color}`,
+          borderRadius:4, color:color, fontSize:11, padding:"3px 10px",
+          cursor:"pointer", fontFamily:"inherit" }}>+</button>
+    </div>
+  );
+}
+
 // ── WORK DOMAIN VIEW ──────────────────────────────────────────────────────────
 const HORIZONS   = ["today", "this week", "someday"];
 const PRIORITIES = ["high", "med", "low"];
@@ -1160,6 +1191,10 @@ function WorkDomainView({ domain, onUpdate }) {
   const notesQueryRef  = useRef(null);
   const [nameQuery, setNameQuery]         = useState("");
   const [summarizing, setSummarizing]     = useState(null);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [addingProject, setAddingProject]     = useState(false);
+  const [newProject, setNewProject]           = useState({ name:"", status:"active", description:"" });
+  const [projectNoteText, setProjectNoteText] = useState("");
 
   const todos    = domain.todos    || [];
   const contacts = domain.contacts || [];
@@ -1172,8 +1207,9 @@ function WorkDomainView({ domain, onUpdate }) {
   const contactName = (id) => contacts.find(c => c.id === id)?.name || "—";
 
   const WORK_TABS = [
-    { id: "todos", label: "ToDos" },
-    { id: "crm",   label: "People" },
+    { id: "todos",    label: "ToDos" },
+    { id: "crm",      label: "People" },
+    { id: "projects", label: "Projects" },
   ];
 
   // ── Domain header ────────────────────────────────────────────────────────
@@ -1590,6 +1626,56 @@ function WorkDomainView({ domain, onUpdate }) {
               ))}
             </div>
           )}
+
+          {/* Follow-up points */}
+          {(() => {
+            const followUps = contact.followUps || [];
+            const addFollowUp = (text) => {
+              if (!text.trim()) return;
+              const updated = contacts.map(c => c.id===contact.id
+                ? { ...c, followUps: [...(c.followUps||[]), { id:`fu${Date.now()}`, text, done:false }] }
+                : c);
+              setContacts(updated);
+            };
+            const toggleFollowUp = (fuId) => {
+              const updated = contacts.map(c => c.id===contact.id
+                ? { ...c, followUps: (c.followUps||[]).map(f => f.id===fuId ? { ...f, done:!f.done } : f) }
+                : c);
+              setContacts(updated);
+            };
+            const deleteFollowUp = (fuId) => {
+              const updated = contacts.map(c => c.id===contact.id
+                ? { ...c, followUps: (c.followUps||[]).filter(f => f.id!==fuId) }
+                : c);
+              setContacts(updated);
+            };
+            return (
+              <div style={{ margin:"12px 0" }}>
+                <SectionRule label="follow-up points" color={C.gold} />
+                {followUps.map(f => (
+                  <div key={f.id} style={{ display:"flex", alignItems:"center", gap:8,
+                    padding:"7px 0", borderBottom:`1px solid ${C.border}`,
+                    opacity: f.done ? 0.45 : 1 }}>
+                    <div onClick={() => toggleFollowUp(f.id)}
+                      style={{ width:15, height:15, borderRadius:"50%", flexShrink:0,
+                        border:`2px solid ${C.gold}`,
+                        background: f.done ? C.gold : "transparent",
+                        cursor:"pointer", display:"flex", alignItems:"center",
+                        justifyContent:"center" }}>
+                      {f.done && <span style={{ fontSize:8, color:"#fff", fontWeight:700 }}>✓</span>}
+                    </div>
+                    <span style={{ fontSize:13, color:C.inkMid, fontFamily:"Georgia, serif",
+                      fontStyle:"italic", flex:1,
+                      textDecoration: f.done ? "line-through" : "none" }}>{f.text}</span>
+                    <button onClick={() => deleteFollowUp(f.id)}
+                      style={{ background:"transparent", border:"none", color:C.inkFaint,
+                        cursor:"pointer", fontSize:13, padding:0 }}>×</button>
+                  </div>
+                ))}
+                <FollowUpInput onAdd={addFollowUp} accentColor={C.gold} />
+              </div>
+            );
+          })()}
 
           {/* Writing canvas */}
           {isWriting && (
@@ -2078,6 +2164,241 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
   // Keep old name as alias for button clicks
   const generateSummary = (contactId) => generateSummaryFromCalls(contactId, null);
 
+  // ── PROJECTS TAB ──────────────────────────────────────────────────────────
+  const projects = domain.projects || [];
+  const setProjects = (p) => onUpdate({ ...domain, projects: p });
+  const STATUS_COLORS = { active: C.caqi, paused: C.gold, done: C.green, archived: C.inkFaint };
+
+  const ProjectsTab = () => {
+    const project = selectedProject ? projects.find(p => p.id === selectedProject) : null;
+    const projNoteRef = useRef(null);
+    const fileInputRef = useRef(null);
+
+    const updateProject = (field, val) =>
+      setProjects(projects.map(p => p.id===selectedProject ? { ...p, [field]:val } : p));
+
+    const addProjectNote = () => {
+      const html = projNoteRef.current?.innerHTML?.trim() || "";
+      if (!html) return;
+      const note = { id:`pn${Date.now()}`, html, date: new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"}) };
+      updateProject("notes", [...(project.notes||[]), note]);
+      if (projNoteRef.current) projNoteRef.current.innerHTML = "";
+    };
+
+    const addFile = (file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const f = { id:`pf${Date.now()}`, name:file.name, type:file.type, size:file.size,
+          data: e.target.result, date: new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"}) };
+        updateProject("files", [...(project.files||[]), f]);
+      };
+      reader.readAsDataURL(file);
+    };
+
+    if (project) return (
+      <div>
+        <button onClick={() => setSelectedProject(null)}
+          style={{ background:"transparent", border:"none", color:domain.color,
+            cursor:"pointer", fontSize:12, fontFamily:"Georgia, serif", fontStyle:"italic",
+            padding:"0 0 14px", display:"block" }}>← projects</button>
+
+        {/* Project header */}
+        <div style={{ paddingBottom:14, marginBottom:14, borderBottom:`1px solid ${C.border}` }}>
+          <EditField label="" field="name" value={project.name} placeholder="Project name"
+            accentColor={domain.color} onCommit={updateProject} />
+          <div style={{ display:"flex", gap:6, marginTop:10, flexWrap:"wrap" }}>
+            {Object.keys(STATUS_COLORS).map(s => (
+              <button key={s} onClick={() => updateProject("status", s)}
+                style={{ background: project.status===s ? STATUS_COLORS[s] : "transparent",
+                  color: project.status===s ? "#fff" : STATUS_COLORS[s],
+                  border:`1.5px solid ${STATUS_COLORS[s]}`,
+                  borderRadius:20, padding:"2px 10px", fontSize:10, cursor:"pointer",
+                  fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{s}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Description */}
+        <EditField label="Description" field="description" value={project.description}
+          placeholder="What is this project about?" multiline
+          accentColor={domain.color} onCommit={updateProject} />
+
+        {/* Follow-up points */}
+        <div style={{ margin:"14px 0" }}>
+          <SectionRule label="follow-up points" color={C.gold} />
+          {(project.followUps||[]).map(f => (
+            <div key={f.id} style={{ display:"flex", alignItems:"center", gap:8,
+              padding:"7px 0", borderBottom:`1px solid ${C.border}`,
+              opacity: f.done ? 0.45 : 1 }}>
+              <div onClick={() => updateProject("followUps", (project.followUps||[]).map(x => x.id===f.id ? { ...x, done:!x.done } : x))}
+                style={{ width:15, height:15, borderRadius:"50%", flexShrink:0,
+                  border:`2px solid ${C.gold}`, background: f.done ? C.gold : "transparent",
+                  cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                {f.done && <span style={{ fontSize:8, color:"#fff", fontWeight:700 }}>✓</span>}
+              </div>
+              <span style={{ fontSize:13, color:C.inkMid, fontFamily:"Georgia, serif",
+                fontStyle:"italic", flex:1, textDecoration: f.done ? "line-through" : "none" }}>{f.text}</span>
+              <button onClick={() => updateProject("followUps", (project.followUps||[]).filter(x => x.id!==f.id))}
+                style={{ background:"transparent", border:"none", color:C.inkFaint,
+                  cursor:"pointer", fontSize:13, padding:0 }}>×</button>
+            </div>
+          ))}
+          <FollowUpInput accentColor={C.gold}
+            onAdd={text => updateProject("followUps", [...(project.followUps||[]), { id:`fu${Date.now()}`, text, done:false }])} />
+        </div>
+
+        {/* Notes */}
+        <div style={{ margin:"14px 0" }}>
+          <SectionRule label="notes" color={domain.color} />
+          {(project.notes||[]).map(n => (
+            <div key={n.id} style={{ marginBottom:14, paddingBottom:14, borderBottom:`1px solid ${C.border}` }}>
+              <div style={{ fontSize:11, color:domain.color, fontFamily:"'Courier New', monospace",
+                marginBottom:6 }}>{n.date}</div>
+              <div dangerouslySetInnerHTML={{ __html: n.html }}
+                style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif", lineHeight:1.7 }} />
+              <button onClick={() => updateProject("notes", (project.notes||[]).filter(x => x.id!==n.id))}
+                style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
+                  borderRadius:3, color:C.inkFaint, fontSize:10, padding:"2px 8px",
+                  cursor:"pointer", fontFamily:"inherit", marginTop:6 }}>Delete</button>
+            </div>
+          ))}
+          {/* Note input */}
+          <div style={{ border:`1px solid ${C.border}`, borderRadius:6, overflow:"hidden", marginTop:8 }}>
+            <div style={{ display:"flex", gap:2, padding:"5px 8px", borderBottom:`1px solid ${C.border}` }}>
+              {[{cmd:"bold",icon:"B",s:{fontWeight:700}},{cmd:"italic",icon:"I",s:{fontStyle:"italic"}},{cmd:"insertUnorderedList",icon:"• —",s:{}}].map(({cmd,icon,s}) => (
+                <button key={cmd} onMouseDown={e=>{e.preventDefault();document.execCommand(cmd);}}
+                  style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:3,
+                    padding:"0 7px", height:22, cursor:"pointer", fontSize:11, color:C.inkMid, ...s }}>{icon}</button>
+              ))}
+            </div>
+            <div ref={projNoteRef} dir="ltr" contentEditable suppressContentEditableWarning
+              onKeyDown={noteKeyHandler}
+              data-placeholder="Add a note…"
+              style={{ minHeight:80, padding:10, outline:"none", fontSize:13,
+                fontFamily:"Georgia, serif", lineHeight:1.7, color:C.ink,
+                direction:"ltr", textAlign:"left" }} />
+            <div style={{ padding:"6px 10px", borderTop:`1px solid ${C.border}`, textAlign:"right" }}>
+              <button onClick={addProjectNote}
+                style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
+                  fontSize:11, padding:"4px 14px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add note</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Documents */}
+        <div style={{ margin:"14px 0" }}>
+          <SectionRule label="documents" color={domain.color} />
+          {(project.files||[]).map(f => (
+            <div key={f.id} style={{ display:"flex", alignItems:"center", gap:10,
+              padding:"8px 0", borderBottom:`1px solid ${C.border}` }}>
+              <div style={{ width:32, height:32, borderRadius:4, background:domain.colorLight,
+                border:`1px solid ${domain.color}33`, display:"flex", alignItems:"center",
+                justifyContent:"center", flexShrink:0 }}>
+                <span style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace" }}>
+                  {f.name.split('.').pop().toUpperCase().slice(0,3)}
+                </span>
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, color:C.ink, fontFamily:"Georgia, serif",
+                  overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{f.name}</div>
+                <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+                  {f.date} · {(f.size/1024).toFixed(0)}KB
+                </div>
+              </div>
+              <a href={f.data} download={f.name}
+                style={{ fontSize:11, color:domain.color, fontFamily:"'Courier New', monospace",
+                  textDecoration:"none", flexShrink:0 }}>↓ download</a>
+              <button onClick={() => updateProject("files", (project.files||[]).filter(x => x.id!==f.id))}
+                style={{ background:"transparent", border:"none", color:C.inkFaint,
+                  cursor:"pointer", fontSize:13, padding:0 }}>×</button>
+            </div>
+          ))}
+          <div style={{ marginTop:8 }}>
+            <input ref={fileInputRef} type="file" accept="*/*" style={{ display:"none" }}
+              onChange={e => { if(e.target.files?.[0]) addFile(e.target.files[0]); }} />
+            <button onClick={() => fileInputRef.current?.click()}
+              style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
+                borderRadius:6, padding:"9px", color:C.inkFaint, fontSize:12,
+                cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic" }}>
+              + Attach document
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+
+    return (
+      <div>
+        <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
+          {projects.map(p => (
+            <div key={p.id} onClick={() => setSelectedProject(p.id)}
+              style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 0",
+                borderBottom:`1px solid ${C.border}`, cursor:"pointer" }}>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif",
+                  fontWeight:500 }}>{p.name}</div>
+                {p.description && (
+                  <div style={{ fontSize:11, color:C.inkLight, fontStyle:"italic", marginTop:2,
+                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.description}</div>
+                )}
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4, flexShrink:0 }}>
+                <span style={{ fontSize:9, color:STATUS_COLORS[p.status]||C.inkFaint,
+                  background:(STATUS_COLORS[p.status]||C.inkFaint)+"18",
+                  border:`1px solid ${STATUS_COLORS[p.status]||C.inkFaint}44`,
+                  borderRadius:10, padding:"1px 7px",
+                  fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{p.status}</span>
+                <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+                  {(p.notes||[]).length} note{(p.notes||[]).length!==1?"s":""} · {(p.files||[]).length} file{(p.files||[]).length!==1?"s":""}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Add project */}
+        {addingProject ? (
+          <div style={{ marginTop:12, padding:"12px 0", borderTop:`1px solid ${C.border}` }}>
+            <input dir="ltr" value={newProject.name} autoFocus
+              onChange={e => setNewProject({...newProject, name:e.target.value})}
+              onKeyDown={e => e.key==="Escape" && setAddingProject(false)}
+              placeholder="Project name…"
+              style={{ width:"100%", background:"transparent", border:"none",
+                borderBottom:`1px solid ${domain.color}`, color:C.ink, fontSize:14,
+                fontFamily:"Georgia, serif", fontStyle:"italic",
+                padding:"4px 0", outline:"none", boxSizing:"border-box", marginBottom:10 }} />
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:10 }}>
+              {Object.keys(STATUS_COLORS).map(s => (
+                <button key={s} onClick={() => setNewProject({...newProject, status:s})}
+                  style={{ background: newProject.status===s ? STATUS_COLORS[s] : "transparent",
+                    color: newProject.status===s ? "#fff" : STATUS_COLORS[s],
+                    border:`1.5px solid ${STATUS_COLORS[s]}`,
+                    borderRadius:20, padding:"2px 10px", fontSize:10, cursor:"pointer",
+                    fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{s}</button>
+              ))}
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={() => {
+                if (!newProject.name.trim()) return;
+                setProjects([...projects, { ...newProject, id:`p${Date.now()}`, notes:[], files:[], followUps:[] }]);
+                setNewProject({ name:"", status:"active", description:"" });
+                setAddingProject(false);
+              }} style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
+                fontSize:12, padding:"6px 16px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add</button>
+              <button onClick={() => setAddingProject(false)}
+                style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
+                  color:C.inkFaint, fontSize:12, padding:"6px 10px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setAddingProject(true)}
+            style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
+              borderRadius:6, padding:"9px", color:C.inkFaint, fontSize:12, cursor:"pointer",
+              fontFamily:"Georgia, serif", fontStyle:"italic", marginTop:10 }}>+ Add project</button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -2099,8 +2420,9 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
         ))}
       </div>
       <div style={{ paddingTop:12 }}>
-        {tab === "todos" && <TodosTab />}
-        {tab === "crm"   && <CRMTab />}
+        {tab === "todos"    && <TodosTab />}
+        {tab === "crm"      && <CRMTab />}
+        {tab === "projects" && <ProjectsTab />}
       </div>
     </div>
   );
