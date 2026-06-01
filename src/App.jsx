@@ -2389,6 +2389,7 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
     const projRecognitionRef = useRef(null);
     const [addingMilestone, setAddingMilestone] = useState(false);
     const [newMilestone, setNewMilestone] = useState({ text:"", due:"", owner:"" });
+    const [editingMilestoneId, setEditingMilestoneId] = useState(null);
     const [addingStatus, setAddingStatus] = useState(false);
     const [newStatus, setNewStatus] = useState("");
     const [projRecording, setProjRecording] = useState(false);
@@ -2543,6 +2544,55 @@ Write in first person. Be concise. Plain text only.` }]
           {(project.milestones||[]).map((m, i) => {
             const total = (project.milestones||[]).length;
             const pct = total > 1 ? (i / (total - 1)) * 100 : 0;
+            const isEditing = editingMilestoneId === m.id;
+
+            if (isEditing) return (
+              <div key={m.id} style={{ padding:"10px 0", borderBottom:`1px solid ${C.border}`,
+                borderLeft:`3px solid ${domain.color}`, paddingLeft:10,
+                background:C.caqiLight+"33" }}>
+                <input dir="ltr" defaultValue={m.text} autoFocus id={`medit-text-${m.id}`}
+                  style={{ width:"100%", background:"transparent", border:"none",
+                    borderBottom:`1px solid ${domain.color}`, color:C.ink, fontSize:13,
+                    fontFamily:"Georgia, serif", fontStyle:"italic",
+                    padding:"3px 0", outline:"none", boxSizing:"border-box", marginBottom:8 }} />
+                <div style={{ display:"flex", gap:8, marginBottom:8 }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+                      textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Due date</div>
+                    <input type="date" id={`medit-due-${m.id}`}
+                      defaultValue={m.dueRaw || ""}
+                      style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`,
+                        borderRadius:4, color:C.inkMid, fontSize:12,
+                        fontFamily:"'Courier New', monospace", padding:"4px 6px", outline:"none" }} />
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+                      textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Owner</div>
+                    <input dir="ltr" id={`medit-owner-${m.id}`}
+                      defaultValue={m.owner || ""}
+                      style={{ width:"100%", background:"transparent", border:"none",
+                        borderBottom:`1px solid ${C.border}`, color:C.inkMid, fontSize:12,
+                        fontFamily:"'Courier New', monospace", padding:"3px 0", outline:"none" }} />
+                  </div>
+                </div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <button onClick={() => {
+                    const text  = document.getElementById(`medit-text-${m.id}`)?.value || m.text;
+                    const raw   = document.getElementById(`medit-due-${m.id}`)?.value || "";
+                    const owner = document.getElementById(`medit-owner-${m.id}`)?.value || m.owner;
+                    const due   = raw ? new Date(raw).toLocaleDateString("en-US",{month:"short",day:"numeric"}) : m.due;
+                    updateProject("milestones",
+                      (project.milestones||[]).map(x => x.id===m.id ? { ...x, text, due, dueRaw:raw, owner } : x));
+                    setEditingMilestoneId(null);
+                  }} style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
+                    fontSize:11, padding:"3px 12px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Save</button>
+                  <button onClick={() => setEditingMilestoneId(null)}
+                    style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
+                      color:C.inkFaint, fontSize:11, padding:"3px 8px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+                </div>
+              </div>
+            );
+
             return (
               <div key={m.id} style={{ display:"flex", alignItems:"flex-start", gap:10,
                 padding:"10px 0", borderBottom:`1px solid ${C.border}` }}>
@@ -2556,8 +2606,9 @@ Write in first person. Be concise. Plain text only.` }]
                   {m.done && <span style={{ fontSize:9, color:"#fff", fontWeight:700 }}>✓</span>}
                 </div>
 
-                {/* Milestone content */}
-                <div style={{ flex:1, minWidth:0 }}>
+                {/* Content — tap to edit */}
+                <div onClick={() => setEditingMilestoneId(m.id)}
+                  style={{ flex:1, minWidth:0, cursor:"text" }}>
                   <div style={{ fontSize:13, color: m.done ? C.inkFaint : C.ink,
                     fontFamily:"Georgia, serif", fontStyle:"italic",
                     textDecoration: m.done ? "line-through" : "none",
@@ -2582,11 +2633,17 @@ Write in first person. Be concise. Plain text only.` }]
                   </div>
                 </div>
 
-                {/* Delete milestone */}
-                <button onClick={() => updateProject("milestones",
-                  (project.milestones||[]).filter(x => x.id!==m.id))}
-                  style={{ background:"transparent", border:"none", color:C.inkFaint,
-                    cursor:"pointer", fontSize:13, padding:0, flexShrink:0 }}>×</button>
+                {/* Edit + Delete */}
+                <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+                  <button onClick={() => setEditingMilestoneId(m.id)}
+                    style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
+                      borderRadius:3, color:C.inkFaint, fontSize:10, padding:"2px 7px",
+                      cursor:"pointer", fontFamily:"inherit" }}>edit</button>
+                  <button onClick={() => updateProject("milestones",
+                    (project.milestones||[]).filter(x => x.id!==m.id))}
+                    style={{ background:"transparent", border:"none", color:C.inkFaint,
+                      cursor:"pointer", fontSize:13, padding:0 }}>×</button>
+                </div>
               </div>
             );
           })}
@@ -2601,25 +2658,36 @@ Write in first person. Be concise. Plain text only.` }]
                   color:C.ink, fontSize:13, fontFamily:"Georgia, serif", fontStyle:"italic",
                   padding:"3px 0", outline:"none", width:"100%", boxSizing:"border-box" }} />
               <div style={{ display:"flex", gap:8 }}>
-                <input dir="ltr" value={newMilestone.due}
-                  onChange={e => setNewMilestone({...newMilestone, due:e.target.value})}
-                  placeholder="Due (e.g. Jul 15)"
-                  style={{ flex:1, background:"transparent", border:"none",
-                    borderBottom:`1px solid ${C.border}`, color:C.inkMid, fontSize:12,
-                    fontFamily:"'Courier New', monospace", padding:"3px 0", outline:"none" }} />
-                <input dir="ltr" value={newMilestone.owner}
-                  onChange={e => setNewMilestone({...newMilestone, owner:e.target.value})}
-                  placeholder="Owner"
-                  style={{ flex:1, background:"transparent", border:"none",
-                    borderBottom:`1px solid ${C.border}`, color:C.inkMid, fontSize:12,
-                    fontFamily:"'Courier New', monospace", padding:"3px 0", outline:"none" }} />
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+                    textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Due date</div>
+                  <input type="date" value={newMilestone.dueRaw||""}
+                    onChange={e => {
+                      const raw = e.target.value;
+                      const due = raw ? new Date(raw).toLocaleDateString("en-US",{month:"short",day:"numeric"}) : "";
+                      setNewMilestone({...newMilestone, dueRaw:raw, due});
+                    }}
+                    style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`,
+                      borderRadius:4, color:C.inkMid, fontSize:12,
+                      fontFamily:"'Courier New', monospace", padding:"4px 6px", outline:"none" }} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+                    textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Owner</div>
+                  <input dir="ltr" value={newMilestone.owner}
+                    onChange={e => setNewMilestone({...newMilestone, owner:e.target.value})}
+                    placeholder="Name"
+                    style={{ width:"100%", background:"transparent", border:"none",
+                      borderBottom:`1px solid ${C.border}`, color:C.inkMid, fontSize:12,
+                      fontFamily:"'Courier New', monospace", padding:"3px 0", outline:"none" }} />
+                </div>
               </div>
               <div style={{ display:"flex", gap:8 }}>
                 <button onClick={() => {
                   if (!newMilestone.text.trim()) return;
                   updateProject("milestones", [...(project.milestones||[]),
                     { ...newMilestone, id:`m${Date.now()}`, done:false }]);
-                  setNewMilestone({ text:"", due:"", owner:"" });
+                  setNewMilestone({ text:"", due:"", dueRaw:"", owner:"" });
                   setAddingMilestone(false);
                 }} style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
                   fontSize:11, padding:"4px 14px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add</button>
