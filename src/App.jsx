@@ -53,7 +53,8 @@ async function saveDomainToDb(domain) {
   try {
     await (await supa.from("domains")).upsert({
       id: domain.id, rating: domain.rating,
-      crm_stages: domain.crmStages || null
+      crm_stages: domain.crmStages || null,
+      projects: domain.id === "work" ? (domain.projects || []) : null,
     });
 
     if (domain.goals?.length) {
@@ -161,6 +162,7 @@ async function loadFromDb() {
       if (dbDomain) {
         merged.rating = dbDomain.rating;
         if (dbDomain.crm_stages) merged.crmStages = dbDomain.crm_stages;
+        if (dbDomain.projects)   merged.projects   = dbDomain.projects;
       }
       if (dbGoals.length) merged.goals = dbGoals.map(g => ({
         id: g.id, text: g.text, quarter: g.quarter,
