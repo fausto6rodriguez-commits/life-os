@@ -967,6 +967,145 @@ function ActivitiesSection({ activities, color, colorLight, pillars, onUpdate })
   );
 }
 
+// ── SHARED FIELD COMPONENTS (top-level to prevent remount on parent re-render) ─
+function EditField({ label, value, field, placeholder, multiline, accentColor, onCommit }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value || "");
+  const color = accentColor || C.caqi;
+  const commit = () => { onCommit(field, val); setEditing(false); };
+  return (
+    <div style={{ padding:"8px 0", borderBottom:`1px solid ${C.border}` }}>
+      {label && <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+        textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:3 }}>{label}</div>}
+      {editing ? (
+        <div>
+          {multiline
+            ? <textarea dir="ltr" value={val} onChange={e => setVal(e.target.value)} rows={3}
+                autoFocus style={{ width:"100%", background:"transparent", border:"none",
+                  borderBottom:`1px solid ${color}`, color:C.ink, fontSize:13,
+                  fontFamily:"Georgia, serif", fontStyle:"italic", padding:"2px 0",
+                  outline:"none", resize:"none", boxSizing:"border-box", direction:"ltr" }} />
+            : <input dir="ltr" value={val} onChange={e => setVal(e.target.value)} autoFocus
+                onKeyDown={e => e.key==="Enter" && commit()}
+                style={{ width:"100%", background:"transparent", border:"none",
+                  borderBottom:`1px solid ${color}`, color:C.ink, fontSize:13,
+                  fontFamily:"Georgia, serif", fontStyle:"italic", padding:"2px 0",
+                  outline:"none", boxSizing:"border-box", direction:"ltr" }} />
+          }
+          <div style={{ display:"flex", gap:8, marginTop:6 }}>
+            <button onClick={commit} style={{ background:color, border:"none",
+              borderRadius:3, color:"#fff", fontSize:10, padding:"3px 10px",
+              cursor:"pointer", fontFamily:"inherit" }}>Save</button>
+            <button onClick={() => { setVal(value||""); setEditing(false); }}
+              style={{ background:"transparent", border:`1px solid ${C.border}`,
+                borderRadius:3, color:C.inkFaint, fontSize:10, padding:"3px 8px",
+                cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <div onClick={() => { setVal(value||""); setEditing(true); }}
+          style={{ fontSize:13, color:value ? C.inkMid : C.inkFaint,
+            fontFamily:"Georgia, serif", fontStyle:"italic",
+            cursor:"text", minHeight:18, lineHeight:1.5 }}>
+          {value || <span style={{ opacity:0.4 }}>{placeholder}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TodoEditRow({ t, domainColor, todos, setTodos, setEditingTodo }) {
+  const DURATIONS = ["15min","30min","1hr","2hr","half-day","full-day"];
+  const DUR_COLOR = { "15min":C.green,"30min":C.green,"1hr":C.gold,"2hr":C.gold,"half-day":C.red,"full-day":C.red };
+  return (
+    <div style={{ padding:"10px 0 14px", borderBottom:`1px solid ${C.border}`,
+      background:C.caqiLight+"44", borderLeft:`3px solid ${domainColor}`, paddingLeft:10 }}>
+      <input dir="ltr" value={t.text}
+        onChange={e => setTodos(todos.map(x => x.id===t.id ? { ...x, text:e.target.value } : x))}
+        style={{ width:"100%", background:"transparent", border:"none",
+          borderBottom:`1px solid ${domainColor}`, color:C.ink, fontSize:14,
+          fontFamily:"Georgia, serif", fontStyle:"italic",
+          padding:"3px 0", outline:"none", boxSizing:"border-box", marginBottom:10,
+          direction:"ltr" }} />
+      <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+        textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Time</div>
+      <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:10 }}>
+        {DURATIONS.map(d => (
+          <button key={d} onClick={() => setTodos(todos.map(x => x.id===t.id ? { ...x, duration:d } : x))}
+            style={{ background:t.duration===d ? DUR_COLOR[d] : "transparent",
+              color:t.duration===d ? "#fff" : DUR_COLOR[d],
+              border:`1.5px solid ${DUR_COLOR[d]}`,
+              borderRadius:10, padding:"2px 9px", fontSize:10, cursor:"pointer",
+              fontFamily:"'Courier New', monospace" }}>{d}</button>
+        ))}
+      </div>
+      <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+        textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>When</div>
+      <div style={{ display:"flex", gap:4, marginBottom:10 }}>
+        {HORIZONS.map(h => (
+          <button key={h} onClick={() => setTodos(todos.map(x => x.id===t.id ? { ...x, horizon:h } : x))}
+            style={{ flex:1, background:t.horizon===h ? domainColor : "transparent",
+              color:t.horizon===h ? "#fff" : C.inkLight,
+              border:`1.5px solid ${t.horizon===h ? domainColor : C.border}`,
+              borderRadius:4, padding:"3px 4px", fontSize:11, cursor:"pointer",
+              fontFamily:"Georgia, serif", fontStyle:"italic",
+              textTransform:"capitalize" }}>{h}</button>
+        ))}
+      </div>
+      <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+        textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Project</div>
+      <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:12 }}>
+        {PROJECTS.map(p => (
+          <button key={p} onClick={() => setTodos(todos.map(x => x.id===t.id ? { ...x, project:t.project===p?"":p } : x))}
+            style={{ background:t.project===p ? domainColor : "transparent",
+              color:t.project===p ? "#fff" : C.inkLight,
+              border:`1px solid ${t.project===p ? domainColor : C.border}`,
+              borderRadius:4, padding:"2px 9px", fontSize:10, cursor:"pointer",
+              fontFamily:"'Courier New', monospace" }}>{p}</button>
+        ))}
+      </div>
+      <button onClick={() => setEditingTodo(null)}
+        style={{ background:domainColor, border:"none", borderRadius:4, color:"#fff",
+          fontSize:11, padding:"5px 14px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Done</button>
+    </div>
+  );
+}
+
+// Keyboard handler for note contentEditable areas
+// - Tab: indent (or outdent with Shift)
+// - * + Space: convert to bullet list
+function noteKeyHandler(e) {
+  if (e.key === "Tab") {
+    e.preventDefault();
+    if (e.shiftKey) {
+      document.execCommand("outdent");
+    } else {
+      document.execCommand("indent");
+    }
+    return;
+  }
+  if (e.key === " ") {
+    // Check if the current line starts with * — convert to bullet
+    const sel = window.getSelection();
+    if (!sel?.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    const text = node.textContent || "";
+    const offset = range.startOffset;
+    // Check if text before cursor is just "*"
+    if (text.slice(0, offset).trim() === "*") {
+      e.preventDefault();
+      // Delete the * character
+      const delRange = document.createRange();
+      delRange.setStart(node, 0);
+      delRange.setEnd(node, offset);
+      delRange.deleteContents();
+      // Insert bullet list
+      document.execCommand("insertUnorderedList");
+    }
+  }
+}
+
 // ── WORK DOMAIN VIEW ──────────────────────────────────────────────────────────
 const HORIZONS   = ["today", "this week", "someday"];
 const PRIORITIES = ["high", "med", "low"];
@@ -1080,63 +1219,6 @@ function WorkDomainView({ domain, onUpdate }) {
     someday: [{ label:"→ today", to:"today" }, { label:"→ this week", to:"this week" }],
   };
 
-  // Inline edit form — expands in-place
-  const TodoEditRow = ({ t }) => (
-    <div style={{ padding:"10px 0 14px", borderBottom:`1px solid ${C.border}`,
-      background:C.caqiLight+"44", borderLeft:`3px solid ${domain.color}`, paddingLeft:10 }}>
-      <input value={t.text}
-        onChange={e => setTodos(todos.map(x => x.id===t.id ? { ...x, text:e.target.value } : x))}
-        style={{ width:"100%", background:"transparent", border:"none",
-          borderBottom:`1px solid ${domain.color}`, color:C.ink, fontSize:14,
-          fontFamily:"Georgia, serif", fontStyle:"italic",
-          padding:"3px 0", outline:"none", boxSizing:"border-box", marginBottom:10 }} />
-
-      <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
-        textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Time</div>
-      <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:10 }}>
-        {DURATIONS.map(d => (
-          <button key={d} onClick={() => setTodos(todos.map(x => x.id===t.id ? { ...x, duration:d } : x))}
-            style={{ background:t.duration===d ? DUR_COLOR[d] : "transparent",
-              color:t.duration===d ? "#fff" : DUR_COLOR[d],
-              border:`1.5px solid ${DUR_COLOR[d]}`,
-              borderRadius:10, padding:"2px 9px", fontSize:10, cursor:"pointer",
-              fontFamily:"'Courier New', monospace" }}>{d}</button>
-        ))}
-      </div>
-
-      <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
-        textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>When</div>
-      <div style={{ display:"flex", gap:4, marginBottom:10 }}>
-        {HORIZONS.map(h => (
-          <button key={h} onClick={() => setTodos(todos.map(x => x.id===t.id ? { ...x, horizon:h } : x))}
-            style={{ flex:1, background:t.horizon===h ? domain.color : "transparent",
-              color:t.horizon===h ? "#fff" : C.inkLight,
-              border:`1.5px solid ${t.horizon===h ? domain.color : C.border}`,
-              borderRadius:4, padding:"3px 4px", fontSize:11, cursor:"pointer",
-              fontFamily:"Georgia, serif", fontStyle:"italic",
-              textTransform:"capitalize" }}>{h}</button>
-        ))}
-      </div>
-
-      <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
-        textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Project</div>
-      <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:12 }}>
-        {PROJECTS.map(p => (
-          <button key={p} onClick={() => setTodos(todos.map(x => x.id===t.id ? { ...x, project:t.project===p?"":p } : x))}
-            style={{ background:t.project===p ? domain.color : "transparent",
-              color:t.project===p ? "#fff" : C.inkLight,
-              border:`1px solid ${t.project===p ? domain.color : C.border}`,
-              borderRadius:4, padding:"2px 9px", fontSize:10, cursor:"pointer",
-              fontFamily:"'Courier New', monospace" }}>{p}</button>
-        ))}
-      </div>
-
-      <button onClick={() => setEditingTodo(null)}
-        style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
-          fontSize:11, padding:"5px 14px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Done</button>
-    </div>
-  );
-
   const TodosTab = () => {
     const filtered = todos.filter(t => t.horizon === todoHorizon);
     const open = filtered.filter(t => !t.done);
@@ -1180,7 +1262,7 @@ function WorkDomainView({ domain, onUpdate }) {
             </div>
           )}
           {open.map(t => {
-            if (editingTodo===t.id) return <TodoEditRow key={t.id} t={t} />;
+            if (editingTodo===t.id) return <TodoEditRow key={t.id} t={t} domainColor={domain.color} todos={todos} setTodos={setTodos} setEditingTodo={setEditingTodo} />;
             return (
               <div key={t.id} style={{display:"flex",alignItems:"flex-start",gap:10,
                 padding:"11px 0",borderBottom:`1px solid ${C.border}`}}>
@@ -1332,7 +1414,7 @@ function WorkDomainView({ domain, onUpdate }) {
           <div style={{marginTop:20}}>
             <SectionRule label={`done · ${done.length}`} color={C.inkFaint} />
             {done.map(t => {
-              if (editingTodo===t.id) return <TodoEditRow key={t.id} t={t} />;
+              if (editingTodo===t.id) return <TodoEditRow key={t.id} t={t} domainColor={domain.color} todos={todos} setTodos={setTodos} setEditingTodo={setEditingTodo} />;
               return (
                 <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,
                   padding:"8px 0",borderBottom:`1px solid ${C.border}`,opacity:0.4}}>
@@ -1406,50 +1488,6 @@ function WorkDomainView({ domain, onUpdate }) {
       setEditingNoteId(null);
     };
 
-    // Inline editable field
-    const EditField = ({ label, value, field, placeholder, multiline }) => {
-      const [editing, setEditing] = useState(false);
-      const [val, setVal] = useState(value || "");
-      const commit = () => { updateContact(field, val); setEditing(false); };
-      return (
-        <div style={{ padding:"8px 0", borderBottom:`1px solid ${C.border}` }}>
-          <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
-            textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:3 }}>{label}</div>
-          {editing ? (
-            <div>
-              {multiline
-                ? <textarea dir="ltr" value={val} onChange={e => setVal(e.target.value)} rows={3}
-                    autoFocus style={{ width:"100%", background:"transparent", border:"none",
-                      borderBottom:`1px solid ${domain.color}`, color:C.ink, fontSize:13,
-                      fontFamily:"Georgia, serif", fontStyle:"italic", padding:"2px 0",
-                      outline:"none", resize:"none", boxSizing:"border-box" }} />
-                : <input dir="ltr" value={val} onChange={e => setVal(e.target.value)} autoFocus
-                    onKeyDown={e => e.key==="Enter" && commit()}
-                    style={{ width:"100%", background:"transparent", border:"none",
-                      borderBottom:`1px solid ${domain.color}`, color:C.ink, fontSize:13,
-                      fontFamily:"Georgia, serif", fontStyle:"italic", padding:"2px 0",
-                      outline:"none", boxSizing:"border-box" }} />
-              }
-              <div style={{ display:"flex", gap:8, marginTop:6 }}>
-                <button onClick={commit} style={{ background:domain.color, border:"none",
-                  borderRadius:3, color:"#fff", fontSize:10, padding:"3px 10px",
-                  cursor:"pointer", fontFamily:"inherit" }}>Save</button>
-                <button onClick={() => setEditing(false)} style={{ background:"transparent",
-                  border:`1px solid ${C.border}`, borderRadius:3, color:C.inkFaint,
-                  fontSize:10, padding:"3px 8px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
-              </div>
-            </div>
-          ) : (
-            <div onClick={() => { setVal(value||""); setEditing(true); }}
-              style={{ fontSize:13, color:value ? C.inkMid : C.inkFaint,
-                fontFamily:"Georgia, serif", fontStyle:"italic",
-                cursor:"text", minHeight:18, lineHeight:1.5 }}>
-              {value || <span style={{ opacity:0.4 }}>{placeholder}</span>}
-            </div>
-          )}
-        </div>
-      );
-    };
 
     if (contact) {
       const warmth = contactWarmth(contact.lastContact);
@@ -1471,10 +1509,10 @@ function WorkDomainView({ domain, onUpdate }) {
                 fontFamily:"Georgia, serif", fontWeight:600 }}>{contact.name[0]}</span>
             </div>
             <div style={{ flex:1 }}>
-              <EditField label="" field="name" value={contact.name} placeholder="Name" />
+              <EditField label="" field="name" value={contact.name} placeholder="Name" accentColor={domain.color} onCommit={updateContact} />
               <div style={{ fontSize:12, color:C.inkLight, fontStyle:"italic", marginBottom:8 }}>
-                <EditField label="" field="role" value={contact.role} placeholder="Role" />
-                <EditField label="" field="company" value={contact.company} placeholder="Company" />
+                <EditField label="" field="role" value={contact.role} placeholder="Role" accentColor={domain.color} onCommit={updateContact} />
+                <EditField label="" field="company" value={contact.company} placeholder="Company" accentColor={domain.color} onCommit={updateContact} />
               </div>
               {/* Warmth dots — driven by last contact date */}
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
@@ -1526,13 +1564,13 @@ function WorkDomainView({ domain, onUpdate }) {
           ) : null)}
 
           {/* Editable contact details */}
-          <EditField label="Email" field="email" value={contact.email} placeholder="email@example.com" />
-          <EditField label="Phone" field="phone" value={contact.phone} placeholder="+1 212 555 0000" />
-          <EditField label="LinkedIn" field="linkedin" value={contact.linkedin} placeholder="linkedin.com/in/name" />
+          <EditField label="Email" field="email" value={contact.email} placeholder="email@example.com" accentColor={domain.color} onCommit={updateContact} />
+          <EditField label="Phone" field="phone" value={contact.phone} placeholder="+1 212 555 0000" accentColor={domain.color} onCommit={updateContact} />
+          <EditField label="LinkedIn" field="linkedin" value={contact.linkedin} placeholder="linkedin.com/in/name" accentColor={domain.color} onCommit={updateContact} />
           <EditField label="Personal" field="personal" value={contact.personal}
-            placeholder="Kids, interests, things they've shared about their life…" multiline />
+            placeholder="Kids, interests, things they've shared about their life…" multiline accentColor={domain.color} onCommit={updateContact} />
           <EditField label="Context" field="notes" value={contact.notes}
-            placeholder="Professional context, how you met…" multiline />
+            placeholder="Professional context, how you met…" multiline accentColor={domain.color} onCommit={updateContact} />
 
           {/* Open todos */}
           {todos.filter(t => t.contactId===contact.id && !t.done).length > 0 && (
@@ -1598,7 +1636,7 @@ function WorkDomainView({ domain, onUpdate }) {
                     color:C.ink, fontSize:14, fontFamily:"Georgia, serif", lineHeight:1.8,
                     outline:"none", direction:"ltr", textAlign:"left",
                     whiteSpace:"pre-wrap", wordBreak:"break-word" }}
-                  data-placeholder="Write freely…" />
+                  data-placeholder="Write freely…" onKeyDown={noteKeyHandler} />
                 <div style={{ display:"flex", justifyContent:"flex-end", gap:8,
                   borderTop:`1px solid ${C.border}`, paddingTop:10, marginTop:10 }}>
                   <button onClick={() => setWritingCall(null)}
@@ -1781,6 +1819,7 @@ function WorkDomainView({ domain, onUpdate }) {
                         dir="ltr"
                         contentEditable
                         suppressContentEditableWarning
+                        onKeyDown={noteKeyHandler}
                         dangerouslySetInnerHTML={{ __html: cl.notes }}
                         style={{ padding:12, minHeight:100, color:C.ink,
                           fontSize:14, fontFamily:"Georgia, serif", lineHeight:1.8,
@@ -2922,7 +2961,13 @@ export default function App() {
     document.body.style.direction = "ltr";
     document.body.style.unicodeBidi = "plaintext";
     const style = document.createElement("style");
-    style.innerHTML = `[contenteditable][data-placeholder]:empty:before { content: attr(data-placeholder); color: #b8c4cc; pointer-events: none; font-style: italic; }`;
+    style.innerHTML = `
+      [contenteditable][data-placeholder]:empty:before { content: attr(data-placeholder); color: #b8c4cc; pointer-events: none; font-style: italic; }
+      [contenteditable] ul, [contenteditable] ol { margin: 2px 0; padding-left: 20px; }
+      [contenteditable] li { margin: 0; padding: 0; line-height: 1.6; }
+      [contenteditable] p { margin: 0; padding: 0; }
+      [contenteditable] div { margin: 0; }
+    `;
     document.head.appendChild(style);
   }, []);
 
