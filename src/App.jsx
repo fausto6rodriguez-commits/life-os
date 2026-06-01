@@ -2603,44 +2603,56 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
 
   // ── AI SUMMARIZE ─────────────────────────────────────────────────────────
   // ── Granola integration ───────────────────────────────────────────────────
-  const granolaFetch = async (body) => {
-    const res = await fetch("/api/granola", {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify(body)
-    });
-    const data = await res.json();
-    return data.result || "";
-  };
-
   const openGranola = async (context) => {
     setGranolaOpen(context);
     setGranolaMeetings([]);
     setGranolaLoading(true);
     try {
-      const raw = await granolaFetch({ action:"list", time_range:"last_30_days" });
-      const clean = raw.replace(/```json|```/g,"").trim();
-      const meetings = JSON.parse(clean);
-      setGranolaMeetings(Array.isArray(meetings) ? meetings : []);
+      const res = await fetch("/api/granola", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ action:"list", page_size:20 })
+      });
+      const data = await res.json();
+      if (data.notes) {
+        setGranolaMeetings(data.notes.map(n => ({
+          id: n.id,
+          title: n.title,
+          date: n.created_at ? new Date(n.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}) : "",
+        })));
+      } else if (res.status === 401) {
+        setGranolaMeetings([{ id:"error", title:"Token expired — update GRANOLA_ACCESS_TOKEN in Vercel", date:"" }]);
+      }
     } catch(e) {
       console.error("Granola list failed:", e);
-      setGranolaMeetings([]);
     }
     setGranolaLoading(false);
   };
 
   const importGranolaMeeting = async (meeting, context, updateFn) => {
+    if (meeting.id === "error") return;
     setGranolaImporting(meeting.id);
     try {
-      const raw = await granolaFetch({ action:"get_meeting", meeting_id: meeting.id });
-      const clean = raw.replace(/```json|```/g,"").trim();
-      const data = JSON.parse(clean);
+      const res = await fetch("/api/granola", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ action:"get", note_id: meeting.id })
+      });
+      const data = await res.json();
       const today = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"});
-      const html = [
-        data.summary ? `<p><strong>Summary:</strong> ${data.summary}</p>` : "",
-        data.notes   ? `<p><strong>Notes:</strong> ${data.notes}</p>`   : "",
-      ].filter(Boolean).join("") || `<p>${raw}</p>`;
-      const note = { id:`cl${Date.now()}`, date: data.date || today, notes: html };
-      updateFn(note);
+      const date = data.created_at
+        ? new Date(data.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})
+        : today;
+
+      // Build HTML from summary + transcript
+      const parts = [];
+      if (data.summary) parts.push(`<p><strong>Summary:</strong> ${data.summary}</p>`);
+      if (data.transcript?.length) {
+        const lines = data.transcript
+          .map(t => `<li><em>${t.speaker?.source === "microphone" ? "You" : "Them"}:</em> ${t.text}</li>`)
+          .join("");
+        parts.push(`<ul>${lines}</ul>`);
+      }
+      const html = parts.length ? parts.join("") : `<p>${data.title || meeting.title}</p>`;
+      updateFn({ id:`cl${Date.now()}`, date, notes: html });
     } catch(e) {
       console.error("Granola import failed:", e);
     }
