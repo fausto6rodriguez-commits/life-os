@@ -449,13 +449,46 @@ const DOMAINS = [
         summary: "" },
     ],
     projects: [
-      { id:"p1", name:"Maro", status:"active", description:"Strategic sale process. Targeting cybersecurity-focused banks.",
+      { id:"p1", name:"Maro", status:"active",
+        goal:"Complete strategic sale to a cybersecurity-focused acquirer at a strong valuation.",
+        northStar:"LOI signed by Q3 2026",
+        milestones:[
+          { id:"m1", text:"Bank shortlist finalized", due:"Jun 15", owner:"Fausto", done:true },
+          { id:"m2", text:"Management presentation ready", due:"Jul 1", owner:"Jadon", done:false },
+          { id:"m3", text:"First round bids received", due:"Aug 1", owner:"Fausto", done:false },
+          { id:"m4", text:"LOI signed", due:"Sep 15", owner:"Fausto", done:false },
+        ],
+        weeklyStatus:[ { id:"ws1", date:"May 26", text:"Banks shortlisted to 3. Jadon aligned on process." } ],
         notes:[], files:[] },
-      { id:"p2", name:"Immersiv", status:"active", description:"Lender package prep. Infusion clinic profitability model.",
+      { id:"p2", name:"Immersiv", status:"active",
+        goal:"Secure non-dilutive financing to fund clinic expansion.",
+        northStar:"$2M credit facility closed by Q2",
+        milestones:[
+          { id:"m1", text:"Lender package complete", due:"Jun 10", owner:"Fausto", done:false },
+          { id:"m2", text:"3 lender conversations", due:"Jun 30", owner:"Fausto", done:false },
+          { id:"m3", text:"Term sheet received", due:"Jul 15", owner:"Fausto", done:false },
+        ],
+        weeklyStatus:[],
         notes:[], files:[] },
-      { id:"p3", name:"Bloomwell", status:"active", description:"Series A financing. VBC patient database work.",
+      { id:"p3", name:"Bloomwell", status:"active",
+        goal:"Close Series A and resolve Wilson Sonsini billing dispute.",
+        northStar:"Series A term sheet signed",
+        milestones:[
+          { id:"m1", text:"Updated deck to Justin Williams", due:"Jun 5", owner:"Fausto", done:false },
+          { id:"m2", text:"Billing dispute resolved", due:"Jun 15", owner:"Michael H.", done:false },
+          { id:"m3", text:"Series A closed", due:"Sep 1", owner:"Fausto", done:false },
+        ],
+        weeklyStatus:[],
         notes:[], files:[] },
-      { id:"p4", name:"DCG Fund Operations", status:"active", description:"LP communications, carry program, build pod.",
+      { id:"p4", name:"DCG Fund Operations", status:"active",
+        goal:"Strengthen LP relationships and build institutional fund infrastructure.",
+        northStar:"Fund II first close by Q4 2026",
+        milestones:[
+          { id:"m1", text:"Q2 LP newsletter out", due:"Jun 30", owner:"Fausto", done:false },
+          { id:"m2", text:"Carry program doc finalized", due:"Jun 15", owner:"Fausto", done:false },
+          { id:"m3", text:"Build Pod Leader hired", due:"Aug 1", owner:"Sean", done:false },
+        ],
+        weeklyStatus:[],
         notes:[], files:[] },
     ],
   },
@@ -1183,6 +1216,11 @@ function WorkDomainView({ domain, onUpdate }) {
   const [addingContact, setAddingContact] = useState(false);
   const [selectedCall, setSelectedCall]   = useState(null);
   const [writingCall, setWritingCall]     = useState(null);
+  const [recording, setRecording]         = useState(false);
+  const [transcript, setTranscript]       = useState("");
+  const [generatingNotes, setGeneratingNotes] = useState(false);
+  const [recordedNotes, setRecordedNotes] = useState("");
+  const recognitionRef = useRef(null);
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [notesQuery, setNotesQuery]       = useState("");
   const [notesAnswer, setNotesAnswer]     = useState("");
@@ -1512,7 +1550,91 @@ function WorkDomainView({ domain, onUpdate }) {
         contacts: (domain.contacts||[]).map(c =>
           c.id===selectedContact ? { ...c, lastContact: newCall.date } : c) });
       setWritingCall(null);
-      // Pass fresh calls directly to avoid stale closure
+      setTimeout(() => generateSummaryFromCalls(selectedContact, updated), 150);
+    };
+
+    const startRecording = () => {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert("Speech recognition not supported in this browser. Try Chrome or Safari.");
+        return;
+      }
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+      let finalTranscript = "";
+      recognition.onresult = (e) => {
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript;
+          if (e.results[i].isFinal) finalTranscript += t + " ";
+          else interim += t;
+        }
+        setTranscript(finalTranscript + interim);
+      };
+      recognition.onerror = (e) => {
+        console.error("Speech error:", e.error);
+        setRecording(false);
+      };
+      recognition.onend = () => setRecording(false);
+      recognitionRef.current = recognition;
+      recognition.start();
+      setRecording(true);
+      setTranscript("");
+      setRecordedNotes("");
+    };
+
+    const stopRecording = async () => {
+      recognitionRef.current?.stop();
+      setRecording(false);
+      const raw = transcript.trim();
+      if (!raw) return;
+      setGeneratingNotes(true);
+      const contact = contacts.find(c => c.id === selectedContact);
+      try {
+        const res = await fetch("/api/claude", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514", max_tokens: 1000,
+            messages:[{ role:"user", content:
+              `You are helping an investor take notes from a meeting transcript.
+
+Contact: ${contact?.name} (${contact?.role} at ${contact?.company})
+
+Raw transcript:
+${raw}
+
+Convert this into clean, structured meeting notes. Format:
+- 2-3 sentences of what was discussed
+- Key points or decisions (bullet list)
+- Next actions or commitments
+
+Write in first person. Be concise. Return plain text, no markdown headers.` }]
+          })
+        });
+        const data = await res.json();
+        const notes = data.content?.find(b => b.type==="text")?.text || raw;
+        setRecordedNotes(notes);
+      } catch(e) {
+        setRecordedNotes(raw); // fall back to raw transcript
+      }
+      setGeneratingNotes(false);
+    };
+
+    const saveRecordedNote = async () => {
+      if (!recordedNotes.trim() || !selectedContact) return;
+      // Convert plain text to HTML with line breaks
+      const html = recordedNotes.split("\n").map(l =>
+        l.startsWith("- ") ? `<li>${l.slice(2)}</li>` : `<p>${l}</p>`
+      ).join("");
+      const newCall = { id:`cl${Date.now()}`, contactId:selectedContact, date:today, notes:html };
+      const updated = [newCall, ...calls];
+      onUpdate({ ...domain, calls: updated,
+        contacts: (domain.contacts||[]).map(c =>
+          c.id===selectedContact ? { ...c, lastContact: newCall.date } : c) });
+      setRecordedNotes("");
+      setTranscript("");
       setTimeout(() => generateSummaryFromCalls(selectedContact, updated), 150);
     };
 
@@ -1563,12 +1685,17 @@ function WorkDomainView({ domain, onUpdate }) {
                 </span>
               </div>
             </div>
-            {!isWriting && (
-              <button onClick={() => setWritingCall({ contactId:selectedContact, date:today })}
-                style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
-                  fontSize:11, padding:"5px 12px", cursor:"pointer",
-                  fontFamily:"Georgia, serif", fontStyle:"italic", fontWeight:600,
-                  flexShrink:0 }}>+ note</button>
+            {!isWriting && !recording && !recordedNotes && (
+              <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+                <button onClick={() => setWritingCall({ contactId:selectedContact, date:today })}
+                  style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
+                    fontSize:11, padding:"5px 12px", cursor:"pointer",
+                    fontFamily:"Georgia, serif", fontStyle:"italic", fontWeight:600 }}>+ note</button>
+                <button onClick={startRecording}
+                  style={{ background:"transparent", border:`1.5px solid ${C.red}`,
+                    borderRadius:4, color:C.red, fontSize:11, padding:"5px 10px",
+                    cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic" }}>🎙 record</button>
+              </div>
             )}
           </div>
 
@@ -1677,7 +1804,93 @@ function WorkDomainView({ domain, onUpdate }) {
             );
           })()}
 
-          {/* Writing canvas */}
+          {/* Recording UI */}
+          {(recording || generatingNotes || recordedNotes) && (
+            <div style={{ margin:"14px 0", border:`1.5px solid ${C.red}33`,
+              borderLeft:`3px solid ${C.red}`, borderRadius:6, overflow:"hidden" }}>
+
+              {/* Recording header */}
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+                padding:"10px 14px", background:`${C.red}08`,
+                borderBottom:`1px solid ${C.red}22` }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  {recording && (
+                    <div style={{ width:8, height:8, borderRadius:"50%", background:C.red,
+                      animation:"pulse 1s infinite" }} />
+                  )}
+                  <span style={{ fontSize:11, color:C.red, fontFamily:"'Courier New', monospace",
+                    textTransform:"uppercase", letterSpacing:"0.08em" }}>
+                    {recording ? "Recording…" : generatingNotes ? "Generating notes…" : "Review notes"}
+                  </span>
+                </div>
+                {recording && (
+                  <button onClick={stopRecording}
+                    style={{ background:C.red, border:"none", borderRadius:4, color:"#fff",
+                      fontSize:11, padding:"4px 14px", cursor:"pointer",
+                      fontFamily:"inherit", fontWeight:600 }}>Stop + generate</button>
+                )}
+                {!recording && !generatingNotes && (
+                  <button onClick={() => { setRecordedNotes(""); setTranscript(""); }}
+                    style={{ background:"transparent", border:"none", color:C.inkFaint,
+                      cursor:"pointer", fontSize:14, padding:0 }}>×</button>
+                )}
+              </div>
+
+              {/* Live transcript */}
+              {(recording || transcript) && !recordedNotes && (
+                <div style={{ padding:"10px 14px", maxHeight:120, overflowY:"auto" }}>
+                  <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+                    textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:6 }}>
+                    Live transcript
+                  </div>
+                  <div style={{ fontSize:13, color:C.inkMid, fontFamily:"Georgia, serif",
+                    fontStyle:"italic", lineHeight:1.7 }}>
+                    {transcript || <span style={{ opacity:0.4 }}>Start speaking…</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* Generating spinner */}
+              {generatingNotes && (
+                <div style={{ padding:"14px", fontSize:12, color:C.inkFaint, fontStyle:"italic" }}>
+                  Claude is reading the transcript…
+                </div>
+              )}
+
+              {/* Generated notes — editable before saving */}
+              {recordedNotes && !generatingNotes && (
+                <div style={{ padding:"10px 14px" }}>
+                  <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+                    textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:6 }}>
+                    Generated notes · tap to edit
+                  </div>
+                  <textarea
+                    dir="ltr"
+                    value={recordedNotes}
+                    onChange={e => setRecordedNotes(e.target.value)}
+                    style={{ width:"100%", background:"transparent", border:"none",
+                      color:C.ink, fontSize:13, fontFamily:"Georgia, serif",
+                      fontStyle:"italic", lineHeight:1.7,
+                      padding:0, outline:"none", resize:"none",
+                      boxSizing:"border-box", direction:"ltr", textAlign:"left",
+                      unicodeBidi:"plaintext", minHeight:120 }}
+                    rows={6}
+                  />
+                  <div style={{ display:"flex", justifyContent:"flex-end", gap:8,
+                    borderTop:`1px solid ${C.border}`, paddingTop:10, marginTop:8 }}>
+                    <button onClick={() => { setRecordedNotes(""); setTranscript(""); startRecording(); }}
+                      style={{ background:"transparent", border:`1px solid ${C.red}`,
+                        borderRadius:4, color:C.red, fontSize:11, padding:"5px 12px",
+                        cursor:"pointer", fontFamily:"inherit" }}>🎙 Record again</button>
+                    <button onClick={saveRecordedNote}
+                      style={{ background:domain.color, border:"none", borderRadius:4,
+                        color:"#fff", fontSize:12, padding:"5px 16px", cursor:"pointer",
+                        fontFamily:"inherit", fontWeight:600 }}>Save + summarize</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           {isWriting && (
             <div style={{ margin:"14px 0", background:C.surface,
               border:`1px solid ${domain.color}44`, borderLeft:`3px solid ${domain.color}`,
@@ -1789,7 +2002,7 @@ function WorkDomainView({ domain, onUpdate }) {
                     const notesBlock = contactNotes.map(cl => `[${cl.date}]\n${cl.notes}`).join("\n\n---\n\n");
                     const contact = contacts.find(c => c.id === selectedContact);
                     try {
-                      const res = await fetch("https://api.anthropic.com/v1/messages", {
+                      const res = await fetch("/api/claude", {
                         method:"POST", headers:{"Content-Type":"application/json"},
                         body: JSON.stringify({
                           model:"claude-sonnet-4-20250514", max_tokens:600,
@@ -2127,7 +2340,7 @@ function WorkDomainView({ domain, onUpdate }) {
       .join("\n\n---\n\n");
 
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2173,6 +2386,11 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
     const project = selectedProject ? projects.find(p => p.id === selectedProject) : null;
     const projNoteRef = useRef(null);
     const fileInputRef = useRef(null);
+    const [addingMilestone, setAddingMilestone] = useState(false);
+    const [newMilestone, setNewMilestone] = useState({ text:"", due:"", owner:"" });
+    const [addingStatus, setAddingStatus] = useState(false);
+    const [newStatus, setNewStatus] = useState("");
+    const today = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"});
 
     const updateProject = (field, val) =>
       setProjects(projects.map(p => p.id===selectedProject ? { ...p, [field]:val } : p));
@@ -2180,7 +2398,7 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
     const addProjectNote = () => {
       const html = projNoteRef.current?.innerHTML?.trim() || "";
       if (!html) return;
-      const note = { id:`pn${Date.now()}`, html, date: new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"}) };
+      const note = { id:`pn${Date.now()}`, html, date: today };
       updateProject("notes", [...(project.notes||[]), note]);
       if (projNoteRef.current) projNoteRef.current.innerHTML = "";
     };
@@ -2189,169 +2407,338 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
       const reader = new FileReader();
       reader.onload = (e) => {
         const f = { id:`pf${Date.now()}`, name:file.name, type:file.type, size:file.size,
-          data: e.target.result, date: new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"}) };
+          data:e.target.result, date:today };
         updateProject("files", [...(project.files||[]), f]);
       };
       reader.readAsDataURL(file);
     };
 
+    // ── Project detail view ───────────────────────────────────────────────
     if (project) return (
       <div>
-        <button onClick={() => setSelectedProject(null)}
-          style={{ background:"transparent", border:"none", color:domain.color,
-            cursor:"pointer", fontSize:12, fontFamily:"Georgia, serif", fontStyle:"italic",
-            padding:"0 0 14px", display:"block" }}>← projects</button>
+        {/* Back + delete */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4 }}>
+          <button onClick={() => setSelectedProject(null)}
+            style={{ background:"transparent", border:"none", color:domain.color,
+              cursor:"pointer", fontSize:12, fontFamily:"Georgia, serif", fontStyle:"italic", padding:0 }}>← projects</button>
+          <button onClick={() => {
+            if (!window.confirm(`Delete "${project.name}"?`)) return;
+            setProjects(projects.filter(p => p.id !== selectedProject));
+            setSelectedProject(null);
+          }} style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
+            borderRadius:4, color:C.red, fontSize:11, padding:"3px 10px",
+            cursor:"pointer", fontFamily:"inherit" }}>Delete</button>
+        </div>
 
-        {/* Project header */}
+        {/* Name + status */}
         <div style={{ paddingBottom:14, marginBottom:14, borderBottom:`1px solid ${C.border}` }}>
           <EditField label="" field="name" value={project.name} placeholder="Project name"
             accentColor={domain.color} onCommit={updateProject} />
-          <div style={{ display:"flex", gap:6, marginTop:10, flexWrap:"wrap" }}>
+          <div style={{ display:"flex", gap:5, marginTop:8, flexWrap:"wrap" }}>
             {Object.keys(STATUS_COLORS).map(s => (
               <button key={s} onClick={() => updateProject("status", s)}
-                style={{ background: project.status===s ? STATUS_COLORS[s] : "transparent",
-                  color: project.status===s ? "#fff" : STATUS_COLORS[s],
+                style={{ background:project.status===s ? STATUS_COLORS[s] : "transparent",
+                  color:project.status===s ? "#fff" : STATUS_COLORS[s],
                   border:`1.5px solid ${STATUS_COLORS[s]}`,
-                  borderRadius:20, padding:"2px 10px", fontSize:10, cursor:"pointer",
+                  borderRadius:20, padding:"2px 9px", fontSize:10, cursor:"pointer",
                   fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{s}</button>
             ))}
           </div>
         </div>
 
-        {/* Description */}
-        <EditField label="Description" field="description" value={project.description}
-          placeholder="What is this project about?" multiline
+        {/* Goal */}
+        <EditField label="Goal" field="goal" value={project.goal}
+          placeholder="What does done look like?" multiline
           accentColor={domain.color} onCommit={updateProject} />
 
-        {/* Follow-up points */}
-        <div style={{ margin:"14px 0" }}>
-          <SectionRule label="follow-up points" color={C.gold} />
-          {(project.followUps||[]).map(f => (
-            <div key={f.id} style={{ display:"flex", alignItems:"center", gap:8,
-              padding:"7px 0", borderBottom:`1px solid ${C.border}`,
-              opacity: f.done ? 0.45 : 1 }}>
-              <div onClick={() => updateProject("followUps", (project.followUps||[]).map(x => x.id===f.id ? { ...x, done:!x.done } : x))}
-                style={{ width:15, height:15, borderRadius:"50%", flexShrink:0,
-                  border:`2px solid ${C.gold}`, background: f.done ? C.gold : "transparent",
-                  cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                {f.done && <span style={{ fontSize:8, color:"#fff", fontWeight:700 }}>✓</span>}
+        {/* North star */}
+        <EditField label="North star metric" field="northStar" value={project.northStar}
+          placeholder="The one number that defines success"
+          accentColor={domain.color} onCommit={updateProject} />
+
+        {/* Milestones — Gantt-style */}
+        <div style={{ margin:"16px 0" }}>
+          <SectionRule label="milestones" color={domain.color} />
+          {(project.milestones||[]).length === 0 && !addingMilestone && (
+            <div style={{ fontSize:12, color:C.inkFaint, fontStyle:"italic", padding:"8px 0" }}>No milestones yet.</div>
+          )}
+
+          {/* Gantt rows */}
+          {(project.milestones||[]).map((m, i) => {
+            const total = (project.milestones||[]).length;
+            const pct = total > 1 ? (i / (total - 1)) * 100 : 0;
+            return (
+              <div key={m.id} style={{ display:"flex", alignItems:"flex-start", gap:10,
+                padding:"10px 0", borderBottom:`1px solid ${C.border}` }}>
+                {/* Done toggle */}
+                <div onClick={() => updateProject("milestones",
+                  (project.milestones||[]).map(x => x.id===m.id ? { ...x, done:!x.done } : x))}
+                  style={{ width:16, height:16, borderRadius:"50%", flexShrink:0, marginTop:2,
+                    border:`2px solid ${m.done ? C.green : domain.color}`,
+                    background: m.done ? C.green : "transparent",
+                    cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  {m.done && <span style={{ fontSize:9, color:"#fff", fontWeight:700 }}>✓</span>}
+                </div>
+
+                {/* Milestone content */}
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, color: m.done ? C.inkFaint : C.ink,
+                    fontFamily:"Georgia, serif", fontStyle:"italic",
+                    textDecoration: m.done ? "line-through" : "none",
+                    marginBottom:4 }}>{m.text}</div>
+
+                  {/* Timeline bar */}
+                  <div style={{ height:3, background:C.border, borderRadius:2, marginBottom:4, position:"relative" }}>
+                    <div style={{ position:"absolute", left:`${pct}%`, top:-3, width:9, height:9,
+                      borderRadius:"50%", background: m.done ? C.green : domain.color,
+                      transform:"translateX(-50%)", border:`2px solid ${C.bg}` }} />
+                    {m.done && (
+                      <div style={{ width:`${pct}%`, height:"100%", background:C.green,
+                        borderRadius:2, opacity:0.5 }} />
+                    )}
+                  </div>
+
+                  <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                    {m.due && <span style={{ fontSize:10, color:C.inkFaint,
+                      fontFamily:"'Courier New', monospace" }}>📅 {m.due}</span>}
+                    {m.owner && <span style={{ fontSize:10, color:domain.color,
+                      fontFamily:"'Courier New', monospace" }}>👤 {m.owner}</span>}
+                  </div>
+                </div>
+
+                {/* Delete milestone */}
+                <button onClick={() => updateProject("milestones",
+                  (project.milestones||[]).filter(x => x.id!==m.id))}
+                  style={{ background:"transparent", border:"none", color:C.inkFaint,
+                    cursor:"pointer", fontSize:13, padding:0, flexShrink:0 }}>×</button>
               </div>
-              <span style={{ fontSize:13, color:C.inkMid, fontFamily:"Georgia, serif",
-                fontStyle:"italic", flex:1, textDecoration: f.done ? "line-through" : "none" }}>{f.text}</span>
-              <button onClick={() => updateProject("followUps", (project.followUps||[]).filter(x => x.id!==f.id))}
+            );
+          })}
+
+          {/* Add milestone */}
+          {addingMilestone ? (
+            <div style={{ padding:"10px 0", borderTop:`1px solid ${C.border}`, display:"flex", flexDirection:"column", gap:8 }}>
+              <input dir="ltr" value={newMilestone.text} autoFocus
+                onChange={e => setNewMilestone({...newMilestone, text:e.target.value})}
+                placeholder="Milestone…"
+                style={{ background:"transparent", border:"none", borderBottom:`1px solid ${domain.color}`,
+                  color:C.ink, fontSize:13, fontFamily:"Georgia, serif", fontStyle:"italic",
+                  padding:"3px 0", outline:"none", width:"100%", boxSizing:"border-box" }} />
+              <div style={{ display:"flex", gap:8 }}>
+                <input dir="ltr" value={newMilestone.due}
+                  onChange={e => setNewMilestone({...newMilestone, due:e.target.value})}
+                  placeholder="Due (e.g. Jul 15)"
+                  style={{ flex:1, background:"transparent", border:"none",
+                    borderBottom:`1px solid ${C.border}`, color:C.inkMid, fontSize:12,
+                    fontFamily:"'Courier New', monospace", padding:"3px 0", outline:"none" }} />
+                <input dir="ltr" value={newMilestone.owner}
+                  onChange={e => setNewMilestone({...newMilestone, owner:e.target.value})}
+                  placeholder="Owner"
+                  style={{ flex:1, background:"transparent", border:"none",
+                    borderBottom:`1px solid ${C.border}`, color:C.inkMid, fontSize:12,
+                    fontFamily:"'Courier New', monospace", padding:"3px 0", outline:"none" }} />
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={() => {
+                  if (!newMilestone.text.trim()) return;
+                  updateProject("milestones", [...(project.milestones||[]),
+                    { ...newMilestone, id:`m${Date.now()}`, done:false }]);
+                  setNewMilestone({ text:"", due:"", owner:"" });
+                  setAddingMilestone(false);
+                }} style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
+                  fontSize:11, padding:"4px 14px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add</button>
+                <button onClick={() => setAddingMilestone(false)}
+                  style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
+                    color:C.inkFaint, fontSize:11, padding:"4px 10px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setAddingMilestone(true)}
+              style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
+                borderRadius:6, padding:"7px", color:C.inkFaint, fontSize:11,
+                cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic", marginTop:6 }}>+ Add milestone</button>
+          )}
+        </div>
+
+        {/* Weekly status */}
+        <div style={{ margin:"16px 0" }}>
+          <SectionRule label="weekly status" color={domain.color} />
+          {(project.weeklyStatus||[]).length === 0 && !addingStatus && (
+            <div style={{ fontSize:12, color:C.inkFaint, fontStyle:"italic", padding:"8px 0" }}>No status updates yet.</div>
+          )}
+          {(project.weeklyStatus||[]).map(s => (
+            <div key={s.id} style={{ padding:"10px 0", borderBottom:`1px solid ${C.border}` }}>
+              <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
+                marginBottom:4 }}>{s.date}</div>
+              <div style={{ fontSize:13, color:C.inkMid, fontFamily:"Georgia, serif",
+                fontStyle:"italic", lineHeight:1.6 }}>{s.text}</div>
+              <button onClick={() => updateProject("weeklyStatus",
+                (project.weeklyStatus||[]).filter(x => x.id!==s.id))}
                 style={{ background:"transparent", border:"none", color:C.inkFaint,
-                  cursor:"pointer", fontSize:13, padding:0 }}>×</button>
+                  cursor:"pointer", fontSize:10, padding:"4px 0 0",
+                  fontFamily:"'Courier New', monospace" }}>delete</button>
             </div>
           ))}
-          <FollowUpInput accentColor={C.gold}
-            onAdd={text => updateProject("followUps", [...(project.followUps||[]), { id:`fu${Date.now()}`, text, done:false }])} />
+          {addingStatus ? (
+            <div style={{ paddingTop:10 }}>
+              <textarea dir="ltr" value={newStatus} autoFocus rows={3}
+                onChange={e => setNewStatus(e.target.value)}
+                placeholder={`What happened this week on ${project.name}?`}
+                style={{ width:"100%", background:"transparent", border:"none",
+                  borderBottom:`1px solid ${domain.color}`, color:C.ink, fontSize:13,
+                  fontFamily:"Georgia, serif", fontStyle:"italic", lineHeight:1.6,
+                  padding:"4px 0", outline:"none", resize:"none", boxSizing:"border-box",
+                  direction:"ltr", marginBottom:8 }} />
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={() => {
+                  if (!newStatus.trim()) return;
+                  updateProject("weeklyStatus", [
+                    { id:`ws${Date.now()}`, date:today, text:newStatus },
+                    ...(project.weeklyStatus||[])
+                  ]);
+                  setNewStatus(""); setAddingStatus(false);
+                }} style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
+                  fontSize:11, padding:"4px 14px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add</button>
+                <button onClick={() => setAddingStatus(false)}
+                  style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
+                    color:C.inkFaint, fontSize:11, padding:"4px 10px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setAddingStatus(true)}
+              style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
+                borderRadius:6, padding:"7px", color:C.inkFaint, fontSize:11,
+                cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic", marginTop:6 }}>+ Add this week's status</button>
+          )}
         </div>
 
         {/* Notes */}
-        <div style={{ margin:"14px 0" }}>
+        <div style={{ margin:"16px 0" }}>
           <SectionRule label="notes" color={domain.color} />
           {(project.notes||[]).map(n => (
-            <div key={n.id} style={{ marginBottom:14, paddingBottom:14, borderBottom:`1px solid ${C.border}` }}>
-              <div style={{ fontSize:11, color:domain.color, fontFamily:"'Courier New', monospace",
-                marginBottom:6 }}>{n.date}</div>
+            <div key={n.id} style={{ marginBottom:12, paddingBottom:12, borderBottom:`1px solid ${C.border}` }}>
+              <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace", marginBottom:4 }}>{n.date}</div>
               <div dangerouslySetInnerHTML={{ __html: n.html }}
-                style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif", lineHeight:1.7 }} />
+                style={{ fontSize:13, color:C.ink, fontFamily:"Georgia, serif", lineHeight:1.7 }} />
               <button onClick={() => updateProject("notes", (project.notes||[]).filter(x => x.id!==n.id))}
-                style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
-                  borderRadius:3, color:C.inkFaint, fontSize:10, padding:"2px 8px",
-                  cursor:"pointer", fontFamily:"inherit", marginTop:6 }}>Delete</button>
+                style={{ background:"transparent", border:"none", color:C.inkFaint,
+                  cursor:"pointer", fontSize:10, padding:"3px 0", fontFamily:"'Courier New', monospace" }}>delete</button>
             </div>
           ))}
-          {/* Note input */}
-          <div style={{ border:`1px solid ${C.border}`, borderRadius:6, overflow:"hidden", marginTop:8 }}>
-            <div style={{ display:"flex", gap:2, padding:"5px 8px", borderBottom:`1px solid ${C.border}` }}>
-              {[{cmd:"bold",icon:"B",s:{fontWeight:700}},{cmd:"italic",icon:"I",s:{fontStyle:"italic"}},{cmd:"insertUnorderedList",icon:"• —",s:{}}].map(({cmd,icon,s}) => (
+          <div style={{ border:`1px solid ${C.border}`, borderRadius:6, overflow:"hidden", marginTop:6 }}>
+            <div style={{ display:"flex", gap:2, padding:"4px 8px", borderBottom:`1px solid ${C.border}` }}>
+              {[{cmd:"bold",icon:"B",s:{fontWeight:700}},{cmd:"italic",icon:"I",s:{fontStyle:"italic"}},{cmd:"insertUnorderedList",icon:"•",s:{}}].map(({cmd,icon,s}) => (
                 <button key={cmd} onMouseDown={e=>{e.preventDefault();document.execCommand(cmd);}}
                   style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:3,
                     padding:"0 7px", height:22, cursor:"pointer", fontSize:11, color:C.inkMid, ...s }}>{icon}</button>
               ))}
             </div>
             <div ref={projNoteRef} dir="ltr" contentEditable suppressContentEditableWarning
-              onKeyDown={noteKeyHandler}
-              data-placeholder="Add a note…"
-              style={{ minHeight:80, padding:10, outline:"none", fontSize:13,
-                fontFamily:"Georgia, serif", lineHeight:1.7, color:C.ink,
-                direction:"ltr", textAlign:"left" }} />
-            <div style={{ padding:"6px 10px", borderTop:`1px solid ${C.border}`, textAlign:"right" }}>
+              onKeyDown={noteKeyHandler} data-placeholder="Add a note…"
+              style={{ minHeight:70, padding:10, outline:"none", fontSize:13,
+                fontFamily:"Georgia, serif", lineHeight:1.7, color:C.ink, direction:"ltr" }} />
+            <div style={{ padding:"5px 10px", borderTop:`1px solid ${C.border}`, textAlign:"right" }}>
               <button onClick={addProjectNote}
                 style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
-                  fontSize:11, padding:"4px 14px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add note</button>
+                  fontSize:11, padding:"4px 12px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Add note</button>
             </div>
           </div>
         </div>
 
         {/* Documents */}
-        <div style={{ margin:"14px 0" }}>
+        <div style={{ margin:"16px 0" }}>
           <SectionRule label="documents" color={domain.color} />
           {(project.files||[]).map(f => (
             <div key={f.id} style={{ display:"flex", alignItems:"center", gap:10,
               padding:"8px 0", borderBottom:`1px solid ${C.border}` }}>
-              <div style={{ width:32, height:32, borderRadius:4, background:domain.colorLight,
+              <div style={{ width:30, height:30, borderRadius:4, background:domain.colorLight,
                 border:`1px solid ${domain.color}33`, display:"flex", alignItems:"center",
                 justifyContent:"center", flexShrink:0 }}>
-                <span style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace" }}>
-                  {f.name.split('.').pop().toUpperCase().slice(0,3)}
+                <span style={{ fontSize:9, color:domain.color, fontFamily:"'Courier New', monospace" }}>
+                  {f.name.split('.').pop().toUpperCase().slice(0,4)}
                 </span>
               </div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:13, color:C.ink, fontFamily:"Georgia, serif",
                   overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{f.name}</div>
-                <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+                <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
                   {f.date} · {(f.size/1024).toFixed(0)}KB
                 </div>
               </div>
               <a href={f.data} download={f.name}
-                style={{ fontSize:11, color:domain.color, fontFamily:"'Courier New', monospace",
-                  textDecoration:"none", flexShrink:0 }}>↓ download</a>
-              <button onClick={() => updateProject("files", (project.files||[]).filter(x => x.id!==f.id))}
+                style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
+                  textDecoration:"none", flexShrink:0 }}>↓</a>
+              <button onClick={() => updateProject("files",(project.files||[]).filter(x=>x.id!==f.id))}
                 style={{ background:"transparent", border:"none", color:C.inkFaint,
                   cursor:"pointer", fontSize:13, padding:0 }}>×</button>
             </div>
           ))}
-          <div style={{ marginTop:8 }}>
-            <input ref={fileInputRef} type="file" accept="*/*" style={{ display:"none" }}
-              onChange={e => { if(e.target.files?.[0]) addFile(e.target.files[0]); }} />
-            <button onClick={() => fileInputRef.current?.click()}
-              style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
-                borderRadius:6, padding:"9px", color:C.inkFaint, fontSize:12,
-                cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic" }}>
-              + Attach document
-            </button>
-          </div>
+          <input ref={fileInputRef} type="file" accept="*/*" style={{ display:"none" }}
+            onChange={e => { if(e.target.files?.[0]) addFile(e.target.files[0]); }} />
+          <button onClick={() => fileInputRef.current?.click()}
+            style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
+              borderRadius:6, padding:"8px", color:C.inkFaint, fontSize:11,
+              cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic", marginTop:6 }}>
+            + Attach document
+          </button>
         </div>
       </div>
     );
 
+    // ── Project list view ─────────────────────────────────────────────────
     return (
       <div>
         <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
           {projects.map(p => (
-            <div key={p.id} onClick={() => setSelectedProject(p.id)}
-              style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 0",
-                borderBottom:`1px solid ${C.border}`, cursor:"pointer" }}>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif",
-                  fontWeight:500 }}>{p.name}</div>
-                {p.description && (
-                  <div style={{ fontSize:11, color:C.inkLight, fontStyle:"italic", marginTop:2,
-                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.description}</div>
+            <div key={p.id} style={{ display:"flex", alignItems:"flex-start", gap:10,
+              padding:"12px 0", borderBottom:`1px solid ${C.border}` }}>
+              {/* Tap to open */}
+              <div onClick={() => setSelectedProject(p.id)} style={{ flex:1, cursor:"pointer" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
+                  <span style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif",
+                    fontWeight:500 }}>{p.name}</span>
+                  <span style={{ fontSize:9, color:STATUS_COLORS[p.status]||C.inkFaint,
+                    background:(STATUS_COLORS[p.status]||C.inkFaint)+"18",
+                    border:`1px solid ${STATUS_COLORS[p.status]||C.inkFaint}44`,
+                    borderRadius:10, padding:"1px 7px",
+                    fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{p.status}</span>
+                </div>
+                {p.northStar && (
+                  <div style={{ fontSize:11, color:domain.color, fontFamily:"'Courier New', monospace",
+                    marginBottom:2 }}>◎ {p.northStar}</div>
                 )}
+                {p.goal && (
+                  <div style={{ fontSize:11, color:C.inkLight, fontStyle:"italic",
+                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.goal}</div>
+                )}
+                {/* Milestone progress bar */}
+                {(p.milestones||[]).length > 0 && (() => {
+                  const done = (p.milestones||[]).filter(m => m.done).length;
+                  const total = p.milestones.length;
+                  const pct = Math.round(done/total*100);
+                  return (
+                    <div style={{ marginTop:6, display:"flex", alignItems:"center", gap:8 }}>
+                      <div style={{ flex:1, height:3, background:C.border, borderRadius:2 }}>
+                        <div style={{ width:`${pct}%`, height:"100%",
+                          background: pct===100 ? C.green : domain.color,
+                          borderRadius:2, transition:"width 0.3s" }} />
+                      </div>
+                      <span style={{ fontSize:9, color:C.inkFaint,
+                        fontFamily:"'Courier New', monospace", flexShrink:0 }}>
+                        {done}/{total} milestones
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
-              <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4, flexShrink:0 }}>
-                <span style={{ fontSize:9, color:STATUS_COLORS[p.status]||C.inkFaint,
-                  background:(STATUS_COLORS[p.status]||C.inkFaint)+"18",
-                  border:`1px solid ${STATUS_COLORS[p.status]||C.inkFaint}44`,
-                  borderRadius:10, padding:"1px 7px",
-                  fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{p.status}</span>
-                <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
-                  {(p.notes||[]).length} note{(p.notes||[]).length!==1?"s":""} · {(p.files||[]).length} file{(p.files||[]).length!==1?"s":""}
-                </span>
-              </div>
+              {/* Inline delete × */}
+              <button onClick={e => {
+                e.stopPropagation();
+                if (!window.confirm(`Delete "${p.name}"?`)) return;
+                setProjects(projects.filter(x => x.id !== p.id));
+              }} style={{ background:"transparent", border:"none", color:C.inkFaint,
+                cursor:"pointer", fontSize:16, padding:0, flexShrink:0, lineHeight:1,
+                marginTop:2 }}>×</button>
             </div>
           ))}
         </div>
@@ -2367,20 +2754,21 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
                 borderBottom:`1px solid ${domain.color}`, color:C.ink, fontSize:14,
                 fontFamily:"Georgia, serif", fontStyle:"italic",
                 padding:"4px 0", outline:"none", boxSizing:"border-box", marginBottom:10 }} />
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:10 }}>
+            <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:10 }}>
               {Object.keys(STATUS_COLORS).map(s => (
                 <button key={s} onClick={() => setNewProject({...newProject, status:s})}
-                  style={{ background: newProject.status===s ? STATUS_COLORS[s] : "transparent",
-                    color: newProject.status===s ? "#fff" : STATUS_COLORS[s],
+                  style={{ background:newProject.status===s ? STATUS_COLORS[s] : "transparent",
+                    color:newProject.status===s ? "#fff" : STATUS_COLORS[s],
                     border:`1.5px solid ${STATUS_COLORS[s]}`,
-                    borderRadius:20, padding:"2px 10px", fontSize:10, cursor:"pointer",
+                    borderRadius:20, padding:"2px 9px", fontSize:10, cursor:"pointer",
                     fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{s}</button>
               ))}
             </div>
             <div style={{ display:"flex", gap:8 }}>
               <button onClick={() => {
                 if (!newProject.name.trim()) return;
-                setProjects([...projects, { ...newProject, id:`p${Date.now()}`, notes:[], files:[], followUps:[] }]);
+                setProjects([...projects, { ...newProject, id:`p${Date.now()}`,
+                  goal:"", northStar:"", milestones:[], weeklyStatus:[], notes:[], files:[], followUps:[] }]);
                 setNewProject({ name:"", status:"active", description:"" });
                 setAddingProject(false);
               }} style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
@@ -2399,6 +2787,7 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
       </div>
     );
   };
+
 
   return (
     <div>
@@ -2798,7 +3187,7 @@ function CalendarView({ domains }) {
         source: { type: "base64", media_type: file.type || "image/png", data: base64 }
       };
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("/api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3289,6 +3678,7 @@ export default function App() {
       [contenteditable] li { margin: 0; padding: 0; line-height: 1.6; }
       [contenteditable] p { margin: 0; padding: 0; }
       [contenteditable] div { margin: 0; }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     `;
     document.head.appendChild(style);
   }, []);
