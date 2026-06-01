@@ -1134,22 +1134,22 @@ function noteKeyHandler(e) {
     return;
   }
   if (e.key === " ") {
-    // Check if the current line starts with * — convert to bullet
     const sel = window.getSelection();
     if (!sel?.rangeCount) return;
     const range = sel.getRangeAt(0);
     const node = range.startContainer;
     const text = node.textContent || "";
     const offset = range.startOffset;
-    // Check if text before cursor is just "*"
-    if (text.slice(0, offset).trim() === "*") {
+    if (text.slice(0, offset).trimStart() === "*") {
       e.preventDefault();
-      // Delete the * character
+      // Select the entire * character and delete it, then insert list
       const delRange = document.createRange();
-      delRange.setStart(node, 0);
+      const start = text.indexOf("*");
+      delRange.setStart(node, start);
       delRange.setEnd(node, offset);
-      delRange.deleteContents();
-      // Insert bullet list
+      sel.removeAllRanges();
+      sel.addRange(delRange);
+      document.execCommand("delete");
       document.execCommand("insertUnorderedList");
     }
   }
@@ -1816,7 +1816,17 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
       const warmth = contactWarmth(contact.lastContact);
       return (
         <div>
-          <button onClick={() => { setSelectedContact(null); setWritingCall(null); setNotesQuery(""); setNotesAnswer(""); }}
+          <button onClick={() => {
+            setSelectedContact(null);
+            setWritingCall(null);
+            setNotesQuery("");
+            setNotesAnswer("");
+            // Clear search on back
+            crmSearchValue.current = "";
+            const el = document.getElementById("crm-search-input");
+            if (el) el.value = "";
+            setCrmSearchTick(t => t+1);
+          }}
             style={{ background:"transparent", border:"none", color:domain.color,
               cursor:"pointer", fontSize:12, fontFamily:"Georgia, serif", fontStyle:"italic",
               padding:"0 0 14px", display:"block" }}>← people</button>
@@ -2317,7 +2327,10 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
         {/* People search */}
         <div style={{ marginBottom:12 }}>
           <input
+            ref={el => { if (el) el._searchInput = true; }}
+            id="crm-search-input"
             dir="ltr"
+            defaultValue=""
             onChange={e => {
               crmSearchValue.current = e.target.value;
               if (crmSearchTimer.current) clearTimeout(crmSearchTimer.current);
@@ -2334,7 +2347,14 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
         {/* Stage filters */}
         <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:6 }}>
           {["all", ...CRM_STAGES].map(s => (
-            <button key={s} onClick={() => setCrmFilter(s)}
+            <button key={s} onClick={() => {
+              setCrmFilter(s);
+              // Clear search when switching filters
+              crmSearchValue.current = "";
+              const el = document.getElementById("crm-search-input");
+              if (el) el.value = "";
+              setCrmSearchTick(t => t+1);
+            }}
               style={{ background: crmFilter===s ? (STAGE_COLOR[s]||domain.color) : "transparent",
                 color: crmFilter===s ? "#fff" : (STAGE_COLOR[s]||C.inkLight),
                 border:`1.5px solid ${STAGE_COLOR[s]||domain.color}`,
@@ -2398,49 +2418,94 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
           </div>
         )}
 
-        {/* Contact list — warmth dots from last contact */}
-        <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
-          {filtered
-            .filter(c => !crmSearchValue.current || c.name.toLowerCase().includes(crmSearchValue.current.toLowerCase()) ||
+        {/* Contact list — alphabetical with letter navigator */}
+        {(() => {
+          const visibleContacts = filtered
+            .filter(c => !crmSearchValue.current ||
+              c.name.toLowerCase().includes(crmSearchValue.current.toLowerCase()) ||
               (c.company||"").toLowerCase().includes(crmSearchValue.current.toLowerCase()))
-            .map(c => {
-            const w = contactWarmth(c.lastContact);
-            const cNotes = calls.filter(cl => cl.contactId===c.id);
-            return (
-              <div key={c.id} onClick={() => setSelectedContact(c.id)}
-                style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 0",
-                  borderBottom:`1px solid ${C.border}`, cursor:"pointer" }}>
-                <div style={{ width:32, height:32, borderRadius:"50%", flexShrink:0,
-                  background: STAGE_COLOR[c.stage]+"22",
-                  border:`1.5px solid ${STAGE_COLOR[c.stage]}55`,
-                  display:"flex", alignItems:"center", justifyContent:"center" }}>
-                  <span style={{ fontSize:13, color:STAGE_COLOR[c.stage],
-                    fontFamily:"Georgia, serif", fontWeight:600 }}>{c.name[0]}</span>
-                </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif",
-                    fontWeight:500 }}>{c.name}</div>
-                  <div style={{ fontSize:11, color:C.inkLight, fontStyle:"italic",
-                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                    {c.role} · {c.company}
+            .sort((a,b) => a.name.localeCompare(b.name));
+
+          // Group by first letter
+          const groups = {};
+          visibleContacts.forEach(c => {
+            const letter = c.name[0]?.toUpperCase() || "#";
+            if (!groups[letter]) groups[letter] = [];
+            groups[letter].push(c);
+          });
+          const letters = Object.keys(groups).sort();
+
+          return (
+            <div style={{ display:"flex", gap:0 }}>
+              {/* Contact rows */}
+              <div style={{ flex:1, minWidth:0 }}>
+                {letters.map(letter => (
+                  <div key={letter} id={`crm-letter-${letter}`}>
+                    {/* Letter header */}
+                    <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
+                      fontWeight:700, padding:"8px 0 4px", letterSpacing:"0.1em",
+                      borderBottom:`1px solid ${domain.color}33` }}>{letter}</div>
+                    {groups[letter].map(c => {
+                      const w = contactWarmth(c.lastContact);
+                      return (
+                        <div key={c.id} onClick={() => setSelectedContact(c.id)}
+                          style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 0",
+                            borderBottom:`1px solid ${C.border}`, cursor:"pointer" }}>
+                          <div style={{ width:32, height:32, borderRadius:"50%", flexShrink:0,
+                            background: STAGE_COLOR[c.stage]+"22",
+                            border:`1.5px solid ${STAGE_COLOR[c.stage]}55`,
+                            display:"flex", alignItems:"center", justifyContent:"center" }}>
+                            <span style={{ fontSize:13, color:STAGE_COLOR[c.stage],
+                              fontFamily:"Georgia, serif", fontWeight:600 }}>{c.name[0]}</span>
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif",
+                              fontWeight:500 }}>{c.name}</div>
+                            <div style={{ fontSize:11, color:C.inkLight, fontStyle:"italic",
+                              overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                              {c.role} · {c.company}
+                            </div>
+                          </div>
+                          <div style={{ textAlign:"right", flexShrink:0 }}>
+                            <div style={{ display:"flex", gap:2, justifyContent:"flex-end", marginBottom:3 }}>
+                              {[1,2,3,4,5].map(v => (
+                                <div key={v} style={{ width:7, height:7, borderRadius:"50%",
+                                  background: v<=w ? WARMTH_COLOR(w) : C.border }} />
+                              ))}
+                            </div>
+                            {c.lastContact && (
+                              <div style={{ fontSize:9, color:C.inkFaint,
+                                fontFamily:"'Courier New', monospace" }}>{c.lastContact}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-                <div style={{ textAlign:"right", flexShrink:0 }}>
-                  <div style={{ display:"flex", gap:2, justifyContent:"flex-end", marginBottom:3 }}>
-                    {[1,2,3,4,5].map(v => (
-                      <div key={v} style={{ width:7, height:7, borderRadius:"50%",
-                        background: v<=w ? WARMTH_COLOR(w) : C.border }} />
-                    ))}
-                  </div>
-                  {c.lastContact && (
-                    <div style={{ fontSize:9, color:C.inkFaint,
-                      fontFamily:"'Courier New', monospace" }}>{c.lastContact}</div>
-                  )}
-                </div>
+                ))}
+                {visibleContacts.length === 0 && (
+                  <div style={{ fontSize:13, color:C.inkFaint, fontStyle:"italic",
+                    textAlign:"center", padding:"20px 0" }}>No contacts found.</div>
+                )}
               </div>
-            );
-          })}
-        </div>
+
+              {/* Letter navigator sidebar */}
+              {letters.length > 3 && (
+                <div style={{ display:"flex", flexDirection:"column", alignItems:"center",
+                  paddingLeft:8, paddingTop:4, gap:1, flexShrink:0 }}>
+                  {letters.map(l => (
+                    <button key={l}
+                      onClick={() => document.getElementById(`crm-letter-${l}`)?.scrollIntoView({ behavior:"smooth", block:"start" })}
+                      style={{ background:"transparent", border:"none", color:domain.color,
+                        fontSize:10, fontWeight:700, fontFamily:"'Courier New', monospace",
+                        padding:"1px 4px", cursor:"pointer", lineHeight:1.4,
+                        borderRadius:3, minWidth:18, textAlign:"center" }}>{l}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Add contact */}
         {addingContact ? (
@@ -2533,13 +2598,16 @@ Write a concise, sharp relationship summary (3-5 sentences max). Cover: where th
     const projNoteRef = useRef(null);
     const fileInputRef = useRef(null);
     const projRecognitionRef = useRef(null);
+    const editProjNoteRef = useRef(null);
     const [addingMilestone, setAddingMilestone] = useState(false);
-      const [editingMilestoneId, setEditingMilestoneId] = useState(null);
+    const [editingMilestoneId, setEditingMilestoneId] = useState(null);
     const [addingStatus, setAddingStatus] = useState(false);
-      const [projRecording, setProjRecording] = useState(false);
+    const [projRecording, setProjRecording] = useState(false);
     const [projTranscript, setProjTranscript] = useState("");
     const [projGenerating, setProjGenerating] = useState(false);
     const [projRecordedNotes, setProjRecordedNotes] = useState("");
+    const [expandedProjNote, setExpandedProjNote] = useState(null);
+    const [editingProjNoteId, setEditingProjNoteId] = useState(null);
     const today = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"});
 
     const updateProject = (field, val) =>
@@ -2927,16 +2995,93 @@ Write in first person. Be concise. Plain text only.` }]
             </div>
           )}
 
-          {(project.notes||[]).map(n => (
-            <div key={n.id} style={{ marginBottom:12, paddingBottom:12, borderBottom:`1px solid ${C.border}` }}>
-              <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace", marginBottom:4 }}>{n.date}</div>
-              <div dangerouslySetInnerHTML={{ __html: n.html }}
-                style={{ fontSize:13, color:C.ink, fontFamily:"Georgia, serif", lineHeight:1.7 }} />
-              <button onClick={() => updateProject("notes", (project.notes||[]).filter(x => x.id!==n.id))}
-                style={{ background:"transparent", border:"none", color:C.inkFaint,
-                  cursor:"pointer", fontSize:10, padding:"3px 0", fontFamily:"'Courier New', monospace" }}>delete</button>
-            </div>
-          ))}
+          {(project.notes||[]).map(n => {
+            const isExpanded = expandedProjNote === n.id;
+            const isEditing  = editingProjNoteId === n.id;
+            const stripHtmlLocal = (html) => { const d = document.createElement("div"); d.innerHTML = html; return d.innerText || ""; };
+            const preview = stripHtmlLocal(n.html).slice(0, 80) + (stripHtmlLocal(n.html).length > 80 ? "…" : "");
+            return (
+              <div key={n.id} style={{ borderBottom:`1px solid ${C.border}` }}>
+                {/* Collapsed header */}
+                <div onClick={() => { if (!isEditing) setExpandedProjNote(isExpanded ? null : n.id); }}
+                  style={{ display:"flex", alignItems:"center", gap:10,
+                    padding:"10px 0", cursor:"pointer" }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:10, color:domain.color,
+                      fontFamily:"'Courier New', monospace", marginBottom:2 }}>{n.date}</div>
+                    {!isExpanded && (
+                      <div style={{ fontSize:12, color:C.inkFaint, fontStyle:"italic",
+                        overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{preview}</div>
+                    )}
+                  </div>
+                  <span style={{ fontSize:11, color:C.inkFaint, flexShrink:0 }}>
+                    {isExpanded ? "▲" : "▼"}
+                  </span>
+                </div>
+
+                {/* Expanded content */}
+                {isExpanded && (
+                  <div style={{ paddingBottom:10 }}>
+                    {isEditing ? (
+                      <div style={{ border:`1px solid ${domain.color}44`, borderRadius:6, overflow:"hidden" }}>
+                        <div style={{ display:"flex", gap:2, padding:"4px 8px",
+                          borderBottom:`1px solid ${C.border}` }}>
+                          {[{cmd:"bold",icon:"B",s:{fontWeight:700}},
+                            {cmd:"italic",icon:"I",s:{fontStyle:"italic"}},
+                            {cmd:"insertUnorderedList",icon:"•",s:{}},
+                            {cmd:"indent",icon:"→",s:{}},
+                          ].map(({cmd,icon,s}) => (
+                            <button key={cmd} onMouseDown={e=>{e.preventDefault();document.execCommand(cmd);}}
+                              style={{ background:"transparent", border:`1px solid ${C.border}`,
+                                borderRadius:3, padding:"0 6px", height:22, cursor:"pointer",
+                                fontSize:11, color:C.inkMid, ...s }}>{icon}</button>
+                          ))}
+                        </div>
+                        <div ref={editProjNoteRef} dir="ltr" contentEditable
+                          suppressContentEditableWarning onKeyDown={noteKeyHandler}
+                          dangerouslySetInnerHTML={{ __html: n.html }}
+                          style={{ padding:10, minHeight:80, color:C.ink, fontSize:13,
+                            fontFamily:"Georgia, serif", lineHeight:1.7, outline:"none",
+                            direction:"ltr", textAlign:"left" }} />
+                        <div style={{ display:"flex", gap:6, padding:"5px 10px",
+                          borderTop:`1px solid ${C.border}` }}>
+                          <button onClick={() => {
+                            const html = editProjNoteRef.current?.innerHTML?.trim() || "";
+                            if (!html) { setEditingProjNoteId(null); return; }
+                            updateProject("notes", (project.notes||[]).map(x => x.id===n.id ? { ...x, html } : x));
+                            setEditingProjNoteId(null);
+                          }} style={{ background:domain.color, border:"none", borderRadius:3,
+                            color:"#fff", fontSize:10, padding:"3px 12px",
+                            cursor:"pointer", fontFamily:"inherit" }}>Save</button>
+                          <button onClick={() => setEditingProjNoteId(null)}
+                            style={{ background:"transparent", border:`1px solid ${C.border}`,
+                              borderRadius:3, color:C.inkFaint, fontSize:10,
+                              padding:"3px 8px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div dangerouslySetInnerHTML={{ __html: n.html }}
+                          style={{ fontSize:13, color:C.ink, fontFamily:"Georgia, serif", lineHeight:1.7 }} />
+                        <div style={{ display:"flex", gap:8, marginTop:6 }}>
+                          <button onClick={e=>{e.stopPropagation();setEditingProjNoteId(n.id);}}
+                            style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
+                              borderRadius:3, color:C.inkFaint, fontSize:10,
+                              padding:"2px 8px", cursor:"pointer", fontFamily:"inherit" }}>Edit</button>
+                          <button onClick={e=>{e.stopPropagation();
+                            updateProject("notes",(project.notes||[]).filter(x=>x.id!==n.id));
+                            setExpandedProjNote(null);
+                          }} style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
+                            borderRadius:3, color:C.red, fontSize:10,
+                            padding:"2px 8px", cursor:"pointer", fontFamily:"inherit" }}>Delete</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           <div style={{ border:`1px solid ${C.border}`, borderRadius:6, overflow:"hidden", marginTop:6 }}>
             <div style={{ display:"flex", gap:2, padding:"4px 8px", borderBottom:`1px solid ${C.border}` }}>
               {[{cmd:"bold",icon:"B",s:{fontWeight:700}},{cmd:"italic",icon:"I",s:{fontStyle:"italic"}},{cmd:"insertUnorderedList",icon:"•",s:{}}].map(({cmd,icon,s}) => (
@@ -2998,12 +3143,52 @@ Write in first person. Be concise. Plain text only.` }]
     );
 
     // ── Project list view ─────────────────────────────────────────────────
+    const projDragRef = useRef(null); // { id, startY, startIdx }
+    const [dragProjId, setDragProjId] = useState(null);
+    const [dragOverIdx, setDragOverIdx] = useState(null);
+
+    const onProjDragStart = (e, id, idx) => {
+      e.stopPropagation();
+      projDragRef.current = { id, startIdx: idx };
+      setDragProjId(id);
+    };
+
+    const onProjDragOver = (e, idx) => {
+      e.preventDefault();
+      setDragOverIdx(idx);
+    };
+
+    const onProjDrop = (idx) => {
+      if (!projDragRef.current) return;
+      const { id } = projDragRef.current;
+      const fromIdx = projects.findIndex(p => p.id === id);
+      if (fromIdx === -1 || fromIdx === idx) { setDragProjId(null); setDragOverIdx(null); return; }
+      const reordered = [...projects];
+      const [moved] = reordered.splice(fromIdx, 1);
+      reordered.splice(idx, 0, moved);
+      setProjects(reordered);
+      setDragProjId(null);
+      setDragOverIdx(null);
+    };
+
     return (
       <div>
         <div style={{ display:"flex", flexDirection:"column", gap:0 }}>
-          {projects.map(p => (
-            <div key={p.id} style={{ display:"flex", alignItems:"flex-start", gap:10,
-              padding:"12px 0", borderBottom:`1px solid ${C.border}` }}>
+          {projects.map((p, idx) => (
+            <div key={p.id}
+              draggable
+              onDragStart={e => onProjDragStart(e, p.id, idx)}
+              onDragOver={e => onProjDragOver(e, idx)}
+              onDrop={() => onProjDrop(idx)}
+              onDragEnd={() => { setDragProjId(null); setDragOverIdx(null); }}
+              style={{ display:"flex", alignItems:"flex-start", gap:10,
+                padding:"12px 0", borderBottom:`1px solid ${C.border}`,
+                opacity: dragProjId===p.id ? 0.4 : 1,
+                background: dragOverIdx===idx && dragProjId!==p.id ? C.caqiLight : "transparent",
+                transition:"background 0.1s" }}>
+              {/* Drag handle */}
+              <div style={{ color:C.inkFaint, fontSize:14, cursor:"grab",
+                flexShrink:0, paddingTop:3, userSelect:"none" }}>⠿</div>
               {/* Tap to open */}
               <div onClick={() => setSelectedProject(p.id)} style={{ flex:1, cursor:"pointer" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
@@ -3023,7 +3208,6 @@ Write in first person. Be concise. Plain text only.` }]
                   <div style={{ fontSize:11, color:C.inkLight, fontStyle:"italic",
                     overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.goal}</div>
                 )}
-                {/* Milestone progress bar */}
                 {(p.milestones||[]).length > 0 && (() => {
                   const done = (p.milestones||[]).filter(m => m.done).length;
                   const total = p.milestones.length;
