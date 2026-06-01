@@ -1715,7 +1715,7 @@ function WorkDomainView({ domain, onUpdate }) {
         contacts: (domain.contacts||[]).map(c =>
           c.id===selectedContact ? { ...c, lastContact: newCall.date } : c) });
       setWritingCall(null);
-      setTimeout(() => generateSummaryFromCalls(selectedContact, updated), 150);
+      // Summary NOT auto-triggered — user clicks the button manually
     };
 
     const startRecording = () => {
@@ -1800,7 +1800,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
           c.id===selectedContact ? { ...c, lastContact: newCall.date } : c) });
       setRecordedNotes("");
       setTranscript("");
-      setTimeout(() => generateSummaryFromCalls(selectedContact, updated), 150);
+      // Summary NOT auto-triggered — user clicks the button manually
     };
 
     const saveEditedNote = (noteId) => {
@@ -2050,7 +2050,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                     <button onClick={saveRecordedNote}
                       style={{ background:domain.color, border:"none", borderRadius:4,
                         color:"#fff", fontSize:12, padding:"5px 16px", cursor:"pointer",
-                        fontFamily:"inherit", fontWeight:600 }}>Save + summarize</button>
+                        fontFamily:"inherit", fontWeight:600 }}>Save note</button>
                   </div>
                 </div>
               )}
@@ -2110,7 +2110,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                   <button onClick={saveNote}
                     style={{ background:domain.color, border:"none", borderRadius:4,
                       color:"#fff", fontSize:12, padding:"5px 16px", cursor:"pointer",
-                      fontFamily:"inherit", fontWeight:600 }}>Save + summarize</button>
+                      fontFamily:"inherit", fontWeight:600 }}>Save note</button>
                 </div>
               </div>
             </div>
@@ -2214,92 +2214,94 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
           {contactNotes.length > 0 && (
             <div style={{ marginTop:14 }}>
               <SectionRule label="notes" color={domain.color} />
-              {contactNotes.map(cl => (
-                <div key={cl.id} style={{ marginBottom:18, paddingBottom:18,
-                  borderBottom:`1px solid ${C.border}` }}>
-                  <div style={{ display:"flex", justifyContent:"space-between",
-                    alignItems:"center", marginBottom:8 }}>
-                    <div style={{ fontSize:11, color:domain.color,
-                      fontFamily:"'Courier New', monospace" }}>{cl.date}</div>
-                    <div style={{ display:"flex", gap:6 }}>
-                      {editingNoteId === cl.id ? (
-                        <>
-                          <button onClick={() => saveEditedNote(cl.id)}
-                            style={{ background:domain.color, border:"none", borderRadius:3,
-                              color:"#fff", fontSize:10, padding:"2px 10px",
-                              cursor:"pointer", fontFamily:"inherit" }}>Save</button>
-                          <button onClick={() => setEditingNoteId(null)}
-                            style={{ background:"transparent", border:`1px solid ${C.border}`,
-                              borderRadius:3, color:C.inkFaint, fontSize:10,
-                              padding:"2px 8px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
-                        </>
-                      ) : (
-                        <>
-                          <button onClick={() => setEditingNoteId(cl.id)}
-                            style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
-                              borderRadius:3, color:C.inkFaint, fontSize:10,
-                              padding:"2px 8px", cursor:"pointer", fontFamily:"inherit" }}>Edit</button>
-                          <button onClick={() => onUpdate({ ...domain, calls: calls.filter(x => x.id!==cl.id) })}
-                            style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
-                              borderRadius:3, color:C.red, fontSize:10, padding:"2px 8px",
-                              cursor:"pointer", fontFamily:"inherit" }}>Delete</button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {editingNoteId === cl.id ? (
-                    <div style={{ border:`1px solid ${domain.color}44`,
-                      borderRadius:6, overflow:"hidden" }}>
-                      {/* Rich text toolbar for edit mode */}
-                      <div style={{ display:"flex", gap:2, padding:"6px 10px",
-                        borderBottom:`1px solid ${C.border}`, flexWrap:"wrap" }}>
-                        {[
-                          { cmd:"bold",      icon:"B", style:{ fontWeight:700 } },
-                          { cmd:"italic",    icon:"I", style:{ fontStyle:"italic" } },
-                          { cmd:"underline", icon:"U", style:{ textDecoration:"underline" } },
-                        ].map(({ cmd, icon, style:s }) => (
-                          <button key={cmd}
-                            onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
-                            style={{ background:"transparent", border:`1px solid ${C.border}`,
-                              borderRadius:3, width:26, height:24, cursor:"pointer",
-                              fontSize:12, color:C.inkMid, ...s }}>{icon}</button>
-                        ))}
-                        <div style={{ width:1, background:C.border, margin:"0 4px" }} />
-                        {[
-                          { cmd:"insertUnorderedList", icon:"• —" },
-                          { cmd:"insertOrderedList",   icon:"1." },
-                          { cmd:"indent",              icon:"→" },
-                          { cmd:"outdent",             icon:"←" },
-                        ].map(({ cmd, icon }) => (
-                          <button key={cmd}
-                            onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
-                            style={{ background:"transparent", border:`1px solid ${C.border}`,
-                              borderRadius:3, padding:"0 7px", height:24, cursor:"pointer",
-                              fontSize:11, color:C.inkMid, fontFamily:"'Courier New', monospace" }}>{icon}</button>
-                        ))}
+              {contactNotes.map(cl => {
+                const isExpanded = selectedCall === cl.id;
+                const isEditing  = editingNoteId === cl.id;
+                // Preview: first ~80 chars of plain text
+                const preview = stripHtml(cl.notes).slice(0, 80) + (stripHtml(cl.notes).length > 80 ? "…" : "");
+                return (
+                  <div key={cl.id} style={{ borderBottom:`1px solid ${C.border}` }}>
+                    {/* Collapsed header — always visible */}
+                    <div onClick={() => { if (!isEditing) setSelectedCall(isExpanded ? null : cl.id); }}
+                      style={{ display:"flex", alignItems:"center", gap:10,
+                        padding:"10px 0", cursor:"pointer" }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:11, color:domain.color,
+                          fontFamily:"'Courier New', monospace", marginBottom:2 }}>{cl.date}</div>
+                        {!isExpanded && (
+                          <div style={{ fontSize:12, color:C.inkFaint, fontStyle:"italic",
+                            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{preview}</div>
+                        )}
                       </div>
-                      <div
-                        ref={editNoteRef}
-                        dir="ltr"
-                        contentEditable
-                        suppressContentEditableWarning
-                        onKeyDown={noteKeyHandler}
-                        dangerouslySetInnerHTML={{ __html: cl.notes }}
-                        style={{ padding:12, minHeight:100, color:C.ink,
-                          fontSize:14, fontFamily:"Georgia, serif", lineHeight:1.8,
-                          outline:"none", direction:"ltr", textAlign:"left",
-                          whiteSpace:"pre-wrap", wordBreak:"break-word" }}
-                      />
+                      <span style={{ fontSize:11, color:C.inkFaint, flexShrink:0 }}>
+                        {isExpanded ? "▲" : "▼"}
+                      </span>
                     </div>
-                  ) : (
-                    <div
-                      dangerouslySetInnerHTML={{ __html: cl.notes }}
-                      style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif",
-                        lineHeight:1.8 }}
-                    />
-                  )}
-                </div>
-              ))}
+
+                    {/* Expanded content */}
+                    {isExpanded && (
+                      <div style={{ paddingBottom:12 }}>
+                        {isEditing ? (
+                          <div style={{ border:`1px solid ${domain.color}44`, borderRadius:6, overflow:"hidden" }}>
+                            <div style={{ display:"flex", gap:2, padding:"5px 8px",
+                              borderBottom:`1px solid ${C.border}`, flexWrap:"wrap" }}>
+                              {[{cmd:"bold",icon:"B",s:{fontWeight:700}},
+                                {cmd:"italic",icon:"I",s:{fontStyle:"italic"}},
+                                {cmd:"underline",icon:"U",s:{textDecoration:"underline"}},
+                              ].map(({cmd,icon,s}) => (
+                                <button key={cmd} onMouseDown={e=>{e.preventDefault();document.execCommand(cmd);}}
+                                  style={{ background:"transparent", border:`1px solid ${C.border}`,
+                                    borderRadius:3, width:26, height:24, cursor:"pointer",
+                                    fontSize:12, color:C.inkMid, ...s }}>{icon}</button>
+                              ))}
+                              <div style={{ width:1, background:C.border, margin:"0 3px" }} />
+                              {[{cmd:"insertUnorderedList",icon:"• —"},{cmd:"indent",icon:"→"},{cmd:"outdent",icon:"←"}].map(({cmd,icon}) => (
+                                <button key={cmd} onMouseDown={e=>{e.preventDefault();document.execCommand(cmd);}}
+                                  style={{ background:"transparent", border:`1px solid ${C.border}`,
+                                    borderRadius:3, padding:"0 6px", height:24, cursor:"pointer",
+                                    fontSize:11, color:C.inkMid }}>{icon}</button>
+                              ))}
+                            </div>
+                            <div ref={editNoteRef} dir="ltr" contentEditable
+                              suppressContentEditableWarning onKeyDown={noteKeyHandler}
+                              dangerouslySetInnerHTML={{ __html: cl.notes }}
+                              style={{ padding:10, minHeight:80, color:C.ink, fontSize:14,
+                                fontFamily:"Georgia, serif", lineHeight:1.8, outline:"none",
+                                direction:"ltr", textAlign:"left" }} />
+                            <div style={{ display:"flex", gap:6, padding:"6px 10px",
+                              borderTop:`1px solid ${C.border}` }}>
+                              <button onClick={() => saveEditedNote(cl.id)}
+                                style={{ background:domain.color, border:"none", borderRadius:3,
+                                  color:"#fff", fontSize:10, padding:"3px 12px",
+                                  cursor:"pointer", fontFamily:"inherit" }}>Save</button>
+                              <button onClick={() => setEditingNoteId(null)}
+                                style={{ background:"transparent", border:`1px solid ${C.border}`,
+                                  borderRadius:3, color:C.inkFaint, fontSize:10,
+                                  padding:"3px 8px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div dangerouslySetInnerHTML={{ __html: cl.notes }}
+                              style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif",
+                                lineHeight:1.8 }} />
+                            <div style={{ display:"flex", gap:8, marginTop:8 }}>
+                              <button onClick={e=>{e.stopPropagation();setEditingNoteId(cl.id);}}
+                                style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
+                                  borderRadius:3, color:C.inkFaint, fontSize:10,
+                                  padding:"2px 8px", cursor:"pointer", fontFamily:"inherit" }}>Edit</button>
+                              <button onClick={e=>{e.stopPropagation();onUpdate({ ...domain, calls: calls.filter(x=>x.id!==cl.id) });setSelectedCall(null);}}
+                                style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
+                                  borderRadius:3, color:C.red, fontSize:10,
+                                  padding:"2px 8px", cursor:"pointer", fontFamily:"inherit" }}>Delete</button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
           {contactNotes.length===0 && !isWriting && (
