@@ -51,11 +51,14 @@ async function deleteFromDb(table, id) {
 // Save entire domain state to Supabase
 async function saveDomainToDb(domain) {
   try {
-    await (await supa.from("domains")).upsert({
+    const result = await (await supa.from("domains")).upsert({
       id: domain.id, rating: domain.rating,
       crm_stages: domain.crmStages || null,
       projects: domain.id === "work" ? (domain.projects || []) : null,
     });
+    if (domain.id === "work") {
+      console.log("Saved projects to DB:", (domain.projects||[]).length, "projects", result);
+    }
 
     if (domain.goals?.length) {
       await (await supa.from("goals")).upsert(domain.goals.map(g => ({
@@ -163,6 +166,7 @@ async function loadFromDb() {
         merged.rating = dbDomain.rating;
         if (dbDomain.crm_stages) merged.crmStages = dbDomain.crm_stages;
         if (dbDomain.projects)   merged.projects   = dbDomain.projects;
+        if (d.id === "work") console.log("Loaded from DB:", { rating: dbDomain.rating, projects: dbDomain.projects?.length, crm_stages: dbDomain.crm_stages });
       }
       if (dbGoals.length) merged.goals = dbGoals.map(g => ({
         id: g.id, text: g.text, quarter: g.quarter,
