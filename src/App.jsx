@@ -3568,223 +3568,384 @@ Write in first person. Be concise. Plain text only.` }]
 // ── DOMAIN VIEW ───────────────────────────────────────────────────────────────
 // ── BODY DOMAIN VIEW ─────────────────────────────────────────────────────────
 function BodyDomainView({ domain, onUpdate, onBack }) {
-  const [daily, setDaily]       = useState([]);
-  const [activities, setActs]   = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [syncing, setSyncing]   = useState(false);
+  const [daily, setDaily]     = useState([]);
+  const [activities, setActs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab]         = useState("exercise");
   const [lastSync, setLastSync] = useState(null);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const headers = {
-        "apikey": SUPA_KEY, "Authorization": `Bearer ${SUPA_KEY}`
-      };
+      const headers = { "apikey": SUPA_KEY, "Authorization": `Bearer ${SUPA_KEY}` };
       const [d, a] = await Promise.all([
-        fetch(`${SUPA_URL}/rest/v1/health_daily?order=date.desc&limit=14`, { headers }).then(r => r.json()),
-        fetch(`${SUPA_URL}/rest/v1/health_activities?order=date.desc&limit=20`, { headers }).then(r => r.json()),
+        fetch(`${SUPA_URL}/rest/v1/health_daily?order=date.desc&limit=30`, { headers }).then(r => r.json()),
+        fetch(`${SUPA_URL}/rest/v1/health_activities?order=date.desc&limit=50`, { headers }).then(r => r.json()),
       ]);
       if (Array.isArray(d)) setDaily(d);
       if (Array.isArray(a)) setActs(a);
       setLastSync(new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}));
-    } catch(e) { console.error("Body load failed:", e); }
+    } catch(e) { console.error(e); }
     setLoading(false);
   };
 
   useEffect(() => { loadData(); }, []);
 
+  // ── Derived metrics ───────────────────────────────────────────────────────
   const today = daily[0];
-  const yesterday = daily[1];
+  const week7 = daily.slice(0, 7);
+  const week14 = daily.slice(0, 14);
 
-  const fmt = (v, unit="", decimals=0) =>
-    v != null ? `${typeof v === "number" ? v.toFixed(decimals) : v}${unit}` : "—";
+  // Exercise streak — consecutive days with at least one activity
+  const actDates = new Set(activities.map(a => a.date));
+  let streak = 0;
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = d.toISOString().split("T")[0];
+    if (actDates.has(ds)) streak++;
+    else if (i > 0) break;
+  }
 
-  const scoreColor = (v, low, high) =>
-    v == null ? C.inkFaint : v >= high ? C.green : v >= low ? C.gold : C.red;
+  const runs = activities.filter(a => a.activity_type === "running");
+  const strength = activities.filter(a => a.activity_type === "strength_training");
+  const allExercise = activities.filter(a => !["meditation"].includes(a.activity_type));
 
-  const stressColor = (v) =>
-    v == null ? C.inkFaint : v < 26 ? C.green : v < 51 ? C.gold : C.red;
+  const week7Acts = allExercise.filter(a => {
+    const d = new Date(a.date);
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
+    return d >= cutoff;
+  });
 
-  // Weekly aggregates
-  const week = daily.slice(0, 7);
-  const weekSteps = week.reduce((s, d) => s + (d.steps||0), 0);
-  const weekRuns = activities.filter(a => a.activity_type === "running").slice(0, 7);
-  const weekRunKm = weekRuns.reduce((s, a) => s + ((a.distance_meters||0)/1000), 0);
-  const avgStress = week.length ? Math.round(week.reduce((s,d) => s+(d.stress_avg||0), 0) / week.length) : null;
+  const avgDuration = week7Acts.length
+    ? Math.round(week7Acts.reduce((s, a) => s + (a.duration_seconds||0), 0) / week7Acts.length / 60)
+    : null;
 
-  // Mini bar chart for steps (last 7 days)
-  const maxSteps = Math.max(...week.map(d => d.steps||0), 1);
+  const weekRunKm = runs.slice(0, 7).reduce((s, a) => s + ((a.distance_meters||0)/1000), 0);
+  const avgRunKm  = runs.length ? runs.slice(0,10).reduce((s,a) => s+(a.distance_meters||0)/1000, 0) / Math.min(runs.length,10) : 0;
+  const avgRunHR  = runs.filter(r=>r.avg_hr).slice(0,10);
+  const avgHR     = avgRunHR.length ? Math.round(avgRunHR.reduce((s,r)=>s+r.avg_hr,0)/avgRunHR.length) : null;
+  const bestPace  = runs.filter(r=>r.avg_pace_min_per_km).sort((a,b)=>a.avg_pace_min_per_km-b.avg_pace_min_per_km)[0];
 
-  const actIcon = (type) => ({
-    running: "🏃", strength_training: "💪", cycling: "🚴",
-    swimming: "🏊", meditation: "🧘", walking: "🚶", yoga: "🧘",
-  }[type] || "⚡");
+  // Sleep — from daily (device doesn't support stages, so show available)
+  const sleepDays = week7.filter(d => d.sleep_hrs);
+  const avgSleep  = sleepDays.length ? sleepDays.reduce((s,d)=>s+d.sleep_hrs,0)/sleepDays.length : null;
+  const sleepGoal = 7.5;
+  const sleepDebt = avgSleep ? Math.max(0, sleepGoal - avgSleep) * 7 : null;
 
-  const formatDuration = (secs) => {
+  // Health
+  const avgStress7 = week7.filter(d=>d.stress_avg).length
+    ? Math.round(week7.filter(d=>d.stress_avg).reduce((s,d)=>s+d.stress_avg,0)/week7.filter(d=>d.stress_avg).length)
+    : null;
+  const avgRHR = week7.filter(d=>d.resting_hr).length
+    ? Math.round(week7.filter(d=>d.resting_hr).reduce((s,d)=>s+d.resting_hr,0)/week7.filter(d=>d.resting_hr).length)
+    : null;
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const fmt = (v, unit="", dec=0) => v != null ? `${Number(v).toFixed(dec)}${unit}` : "—";
+  const stressColor = v => v==null?C.inkFaint:v<26?C.green:v<51?C.gold:C.red;
+  const scoreColor  = (v,lo,hi) => v==null?C.inkFaint:v>=hi?C.green:v>=lo?C.gold:C.red;
+
+  const formatDur = secs => {
     if (!secs) return "—";
     const m = Math.round(secs/60);
-    return m >= 60 ? `${Math.floor(m/60)}h${m%60 ? m%60+"m" : ""}` : `${m}min`;
+    return m>=60 ? `${Math.floor(m/60)}h${m%60?""+m%60+"m":""}` : `${m}min`;
   };
+
+  const actIcon = type => ({
+    running:"🏃",strength_training:"💪",cycling:"🚴",swimming:"🏊",
+    meditation:"🧘",walking:"🚶",yoga:"🧘",hiking:"🥾"
+  }[type]||"⚡");
+
+  const StatCard = ({label, value, sub, color}) => (
+    <div style={{minWidth:80, flex:1}}>
+      <div style={{fontSize:9,color:C.inkFaint,fontFamily:"'Courier New',monospace",
+        textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{label}</div>
+      <div style={{fontSize:22,color:color||C.ink,fontFamily:"Georgia,serif",fontWeight:600,lineHeight:1}}>{value}</div>
+      {sub && <div style={{fontSize:9,color:C.inkFaint,fontFamily:"'Courier New',monospace",marginTop:2}}>{sub}</div>}
+    </div>
+  );
+
+  const MiniBar = ({data, getVal, getColor, maxVal, getLabel}) => {
+    const max = maxVal || Math.max(...data.map(getVal), 1);
+    return (
+      <div style={{display:"flex",gap:3,alignItems:"flex-end",height:52}}>
+        {[...data].reverse().map((d,i) => {
+          const v = getVal(d);
+          const pct = v/max;
+          return (
+            <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+              <div style={{width:"100%",height:Math.max(2,Math.round(pct*44)),
+                background:getColor?getColor(d,i,data.length):domain.color,
+                borderRadius:"2px 2px 0 0",opacity:i===data.length-1?1:0.6}}/>
+              {getLabel && <div style={{fontSize:7,color:C.inkFaint,fontFamily:"'Courier New',monospace"}}>{getLabel(d)}</div>}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const TABS = [
+    {id:"exercise",label:"Exercise"},
+    {id:"sleep",   label:"Sleep"},
+    {id:"health",  label:"Health"},
+    {id:"nutrition",label:"Nutrition"},
+  ];
 
   return (
     <div>
       {/* Header */}
-      <div style={{ paddingTop:8, paddingBottom:12, textAlign:"center" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10, justifyContent:"center", marginBottom:6 }}>
-          <div style={{ flex:1, height:1, background:`linear-gradient(to right, transparent, ${domain.color}66)` }} />
-          <span style={{ fontSize:22, color:domain.color }}>{domain.glyph}</span>
-          <span style={{ fontSize:28, color:C.navy, fontWeight:700, letterSpacing:"-0.3px" }}>Body</span>
-          <div style={{ flex:1, height:1, background:`linear-gradient(to left, transparent, ${domain.color}66)` }} />
+      <div style={{paddingTop:8,paddingBottom:12,textAlign:"center"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,justifyContent:"center",marginBottom:6}}>
+          <div style={{flex:1,height:1,background:`linear-gradient(to right,transparent,${domain.color}66)`}}/>
+          <span style={{fontSize:22,color:domain.color}}>{domain.glyph}</span>
+          <span style={{fontSize:28,color:C.navy,fontWeight:700,letterSpacing:"-0.3px"}}>Body</span>
+          <div style={{flex:1,height:1,background:`linear-gradient(to left,transparent,${domain.color}66)`}}/>
         </div>
-        <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:10 }}>
-          {lastSync && <span style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>synced {lastSync}</span>}
+        <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8}}>
+          {lastSync&&<span style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace"}}>synced {lastSync}</span>}
           <button onClick={loadData} disabled={loading}
-            style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
-              borderRadius:4, color:C.inkFaint, fontSize:10, padding:"2px 8px",
-              cursor:loading?"default":"pointer", fontFamily:"inherit" }}>
-            {loading ? "…" : "↻"}
+            style={{background:"transparent",border:`1px solid ${C.borderMid}`,
+              borderRadius:4,color:C.inkFaint,fontSize:10,padding:"2px 8px",
+              cursor:loading?"default":"pointer"}}>
+            {loading?"…":"↻ Sync"}
           </button>
         </div>
       </div>
 
+      {/* Tab pills */}
+      <div style={{display:"flex",gap:6,marginBottom:16,
+        background:C.surface,borderRadius:8,padding:4,border:`1px solid ${C.border}`}}>
+        {TABS.map(t => (
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            style={{flex:1,border:"none",borderRadius:6,
+              background:tab===t.id?domain.color:"transparent",
+              color:tab===t.id?"#fff":C.inkFaint,
+              padding:"7px 4px",fontSize:11,cursor:"pointer",
+              fontFamily:"Georgia,serif",fontStyle:"italic",
+              fontWeight:tab===t.id?600:400,
+              boxShadow:tab===t.id?`0 1px 4px ${domain.color}44`:"none",
+              transition:"all 0.15s"}}>{t.label}</button>
+        ))}
+      </div>
+
       {loading ? (
-        <div style={{ textAlign:"center", padding:"30px 0", fontSize:13, color:C.inkFaint, fontStyle:"italic" }}>
-          Loading from Garmin…
-        </div>
-      ) : daily.length === 0 ? (
-        <div style={{ textAlign:"center", padding:"30px 0" }}>
-          <div style={{ fontSize:13, color:C.inkFaint, fontStyle:"italic", marginBottom:8 }}>No data yet.</div>
-          <div style={{ fontSize:11, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
-            Run python3 ~/garmin_sync.py to sync
-          </div>
+        <div style={{textAlign:"center",padding:"30px 0",fontSize:13,color:C.inkFaint,fontStyle:"italic"}}>Loading…</div>
+      ) : daily.length===0 ? (
+        <div style={{textAlign:"center",padding:"30px 0"}}>
+          <div style={{fontSize:13,color:C.inkFaint,fontStyle:"italic",marginBottom:6}}>No data yet.</div>
+          <div style={{fontSize:11,color:C.inkFaint,fontFamily:"'Courier New',monospace"}}>Run: python3 ~/garmin_sync.py</div>
         </div>
       ) : (
-        <>
-          {/* TODAY snapshot */}
-          {today && (
-            <div style={{ marginBottom:16, paddingBottom:16, borderBottom:`1px solid ${C.border}` }}>
-              <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
-                textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:10 }}>
-                Today · {today.date}
-              </div>
-              <div style={{ display:"flex", flexWrap:"wrap", gap:16 }}>
-                {[
-                  { label:"Steps", value: today.steps?.toLocaleString(), unit:"", color: scoreColor(today.steps, 5000, 10000) },
-                  { label:"Calories", value: today.total_calories ? Math.round(today.total_calories) : null, unit:"kcal" },
-                  { label:"Active cal", value: today.active_calories ? Math.round(today.active_calories) : null, unit:"kcal" },
-                  { label:"Stress", value: today.stress_avg ? Math.round(today.stress_avg) : null, unit:"", color: stressColor(today.stress_avg) },
-                  { label:"Resting HR", value: today.resting_hr, unit:"bpm" },
-                ].map((m,i) => (
-                  <div key={i}>
-                    <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
-                      textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:2 }}>{m.label}</div>
-                    <div style={{ fontSize:20, color: m.color || C.ink,
-                      fontFamily:"Georgia, serif", fontWeight:600, lineHeight:1 }}>
-                      {fmt(m.value, m.unit)}
+
+        // ── EXERCISE TAB ────────────────────────────────────────────────────
+        tab==="exercise" ? (
+          <div>
+            {/* Key stats row */}
+            <div style={{display:"flex",flexWrap:"wrap",gap:14,marginBottom:20,
+              paddingBottom:16,borderBottom:`1px solid ${C.border}`}}>
+              <StatCard label="Streak" value={streak>0?`${streak}d`:"—"}
+                sub="consecutive days" color={scoreColor(streak,3,7)}/>
+              <StatCard label="This week" value={week7Acts.length} sub="sessions"/>
+              <StatCard label="Avg duration" value={avgDuration?`${avgDuration}m`:"—"} sub="per session"/>
+              <StatCard label="Weekly km" value={weekRunKm>0?`${weekRunKm.toFixed(1)}km`:"—"} sub="running"/>
+            </div>
+
+            {/* Running stats */}
+            {runs.length>0 && (
+              <div style={{marginBottom:20,paddingBottom:16,borderBottom:`1px solid ${C.border}`}}>
+                <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",
+                  textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Running</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:14,marginBottom:14}}>
+                  <StatCard label="Avg distance" value={`${avgRunKm.toFixed(1)}km`} sub="per run"/>
+                  <StatCard label="Avg HR" value={avgHR?`${avgHR}bpm`:"—"} sub="during run"
+                    color={avgHR?scoreColor(200-avgHR,100,140):undefined}/>
+                  <StatCard label="Best pace" value={bestPace?`${bestPace.avg_pace_min_per_km.toFixed(2)}`:"—"}
+                    sub="min/km" color={C.green}/>
+                  <StatCard label="Total runs" value={runs.length} sub="last 30 days"/>
+                </div>
+
+                {/* Run distance bars */}
+                {runs.slice(0,10).length>1 && (
+                  <>
+                    <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",marginBottom:6}}>
+                      Distance per run (km)
                     </div>
+                    <MiniBar
+                      data={runs.slice(0,10)}
+                      getVal={a=>(a.distance_meters||0)/1000}
+                      getColor={(_,i,len)=>i===len-1?domain.color:`${domain.color}77`}
+                      getLabel={a=>a.date?.slice(5)}/>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Strength */}
+            {strength.length>0 && (
+              <div style={{marginBottom:20,paddingBottom:16,borderBottom:`1px solid ${C.border}`}}>
+                <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",
+                  textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Strength training</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:14}}>
+                  <StatCard label="Sessions" value={strength.length} sub="last 30 days"/>
+                  <StatCard label="Avg duration"
+                    value={formatDur(strength.reduce((s,a)=>s+(a.duration_seconds||0),0)/strength.length)}
+                    sub="per session"/>
+                </div>
+              </div>
+            )}
+
+            {/* Activity log */}
+            <div>
+              <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",
+                textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Recent activities</div>
+              {allExercise.slice(0,12).map((a,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:10,
+                  padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
+                  <span style={{fontSize:15,flexShrink:0}}>{actIcon(a.activity_type)}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,color:C.ink,fontFamily:"Georgia,serif",
+                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {a.name||a.activity_type?.replace(/_/g," ")}
+                    </div>
+                    <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace"}}>
+                      {a.date}{a.avg_hr?` · ${Math.round(a.avg_hr)}bpm`:""}
+                      {a.avg_pace_min_per_km?` · ${a.avg_pace_min_per_km.toFixed(2)}min/km`:""}
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{fontSize:12,color:C.inkMid,fontFamily:"'Courier New',monospace"}}>{formatDur(a.duration_seconds)}</div>
+                    {a.distance_meters>100&&<div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace"}}>{(a.distance_meters/1000).toFixed(1)}km</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        // ── SLEEP TAB ───────────────────────────────────────────────────────
+        ) : tab==="sleep" ? (
+          <div>
+            {sleepDays.length===0 ? (
+              <div style={{textAlign:"center",padding:"20px 0"}}>
+                <div style={{fontSize:13,color:C.inkFaint,fontStyle:"italic"}}>
+                  Sleep data not available from your device.
+                </div>
+                <div style={{fontSize:11,color:C.inkFaint,fontFamily:"'Courier New',monospace",marginTop:6}}>
+                  Your Garmin doesn't report sleep stages (deviceRemCapable: false).
+                </div>
+                <div style={{fontSize:11,color:C.inkFaint,marginTop:10}}>
+                  Devices with Advanced Sleep Monitoring: Fenix 7, Forerunner 965, Venu 3
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:14,marginBottom:20,
+                  paddingBottom:16,borderBottom:`1px solid ${C.border}`}}>
+                  <StatCard label="Avg sleep" value={avgSleep?`${avgSleep.toFixed(1)}h`:"—"}
+                    sub="last 7 nights" color={scoreColor(avgSleep,6,7.5)}/>
+                  <StatCard label="Sleep debt" value={sleepDebt?`${sleepDebt.toFixed(1)}h`:"0h"}
+                    sub="vs 7.5h goal" color={sleepDebt>5?C.red:sleepDebt>2?C.gold:C.green}/>
+                  <StatCard label="Nights logged" value={sleepDays.length} sub="of last 7"/>
+                </div>
+                <MiniBar data={sleepDays.slice(0,7)}
+                  getVal={d=>d.sleep_hrs||0} maxVal={9}
+                  getColor={(d)=>scoreColor(d.sleep_hrs,6,7.5)}
+                  getLabel={d=>d.date?.slice(5)}/>
+              </div>
+            )}
+          </div>
+
+        // ── HEALTH TAB ──────────────────────────────────────────────────────
+        ) : tab==="health" ? (
+          <div>
+            {/* Key health stats */}
+            <div style={{display:"flex",flexWrap:"wrap",gap:14,marginBottom:20,
+              paddingBottom:16,borderBottom:`1px solid ${C.border}`}}>
+              <StatCard label="Resting HR" value={today?.resting_hr?`${today.resting_hr}bpm`:"—"}
+                sub="today" color={scoreColor(80-(today?.resting_hr||60),10,30)}/>
+              <StatCard label="Avg RHR" value={avgRHR?`${avgRHR}bpm`:"—"}
+                sub="7-day avg" color={scoreColor(80-(avgRHR||60),10,30)}/>
+              <StatCard label="Stress today" value={today?.stress_avg?Math.round(today.stress_avg):"—"}
+                sub={today?.stress_qualifier?.toLowerCase().replace(/_/g," ")||""}
+                color={stressColor(today?.stress_avg)}/>
+              <StatCard label="Avg stress" value={avgStress7?`${avgStress7}`:"—"}
+                sub="7-day avg" color={stressColor(avgStress7)}/>
+            </div>
+
+            {/* Stress chart */}
+            <div style={{marginBottom:20,paddingBottom:16,borderBottom:`1px solid ${C.border}`}}>
+              <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",
+                textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>
+                Stress · last 14 days
+              </div>
+              <MiniBar data={week14.filter(d=>d.stress_avg)} maxVal={100}
+                getVal={d=>d.stress_avg||0}
+                getColor={d=>stressColor(d.stress_avg)}
+                getLabel={d=>d.date?.slice(5)}/>
+              <div style={{display:"flex",gap:12,marginTop:8}}>
+                {["<25 calm","25-50 moderate","50+ high"].map((l,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:4}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",
+                      background:[C.green,C.gold,C.red][i]}}/>
+                    <span style={{fontSize:9,color:C.inkFaint,fontFamily:"'Courier New',monospace"}}>{l}</span>
                   </div>
                 ))}
               </div>
-              {today.stress_qualifier && (
-                <div style={{ marginTop:8, fontSize:10, color:stressColor(today.stress_avg),
-                  fontFamily:"'Courier New', monospace" }}>
-                  {today.stress_qualifier.toLowerCase().replace(/_/g," ")}
-                </div>
-              )}
             </div>
-          )}
 
-          {/* STEPS — 7-day bar chart */}
-          <div style={{ marginBottom:16, paddingBottom:16, borderBottom:`1px solid ${C.border}` }}>
-            <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
-              textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>Steps · last 7 days</div>
-            <div style={{ display:"flex", gap:4, alignItems:"flex-end", height:48 }}>
-              {[...week].reverse().map((d, i) => {
-                const pct = (d.steps||0) / maxSteps;
-                const isToday = i === week.length - 1;
-                return (
-                  <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
-                    <div style={{ width:"100%", height: Math.max(2, Math.round(pct*40)),
-                      background: isToday ? domain.color : `${domain.color}66`,
-                      borderRadius:"2px 2px 0 0" }} />
-                    <div style={{ fontSize:8, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
-                      {d.date?.slice(5)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between", marginTop:6 }}>
-              <span style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
-                Week total: {weekSteps.toLocaleString()}
-              </span>
-              <span style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
-                Avg stress: <span style={{ color:stressColor(avgStress) }}>{avgStress ?? "—"}</span>
-              </span>
-            </div>
-          </div>
-
-          {/* STRESS trend */}
-          <div style={{ marginBottom:16, paddingBottom:16, borderBottom:`1px solid ${C.border}` }}>
-            <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
-              textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>Stress · last 7 days</div>
-            <div style={{ display:"flex", gap:4, alignItems:"flex-end", height:32 }}>
-              {[...week].reverse().map((d, i) => {
-                const pct = (d.stress_avg||0) / 100;
-                return (
-                  <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
-                    <div style={{ width:"100%", height: Math.max(2, Math.round(pct*28)),
-                      background: stressColor(d.stress_avg),
-                      borderRadius:"2px 2px 0 0", opacity:0.8 }} />
-                    <div style={{ fontSize:8, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
-                      {d.stress_avg ? Math.round(d.stress_avg) : "—"}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ACTIVITIES */}
-          <div style={{ marginBottom:16 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-              <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
-                textTransform:"uppercase", letterSpacing:"0.08em" }}>Recent activities</div>
-              {weekRunKm > 0 && (
-                <span style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace" }}>
-                  {weekRunKm.toFixed(1)}km this week
-                </span>
-              )}
-            </div>
-            {activities.slice(0, 10).map((a, i) => (
-              <div key={i} style={{ display:"flex", alignItems:"center", gap:10,
-                padding:"8px 0", borderBottom:`1px solid ${C.border}` }}>
-                <span style={{ fontSize:16, flexShrink:0 }}>{actIcon(a.activity_type)}</span>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, color:C.ink, fontFamily:"Georgia, serif",
-                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                    {a.name || a.activity_type?.replace(/_/g," ")}
-                  </div>
-                  <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
-                    {a.date}
-                    {a.avg_hr ? ` · ${Math.round(a.avg_hr)}bpm` : ""}
-                    {a.avg_pace_min_per_km ? ` · ${a.avg_pace_min_per_km.toFixed(2)}min/km` : ""}
-                  </div>
-                </div>
-                <div style={{ textAlign:"right", flexShrink:0 }}>
-                  <div style={{ fontSize:12, color:C.inkMid, fontFamily:"'Courier New', monospace" }}>
-                    {formatDuration(a.duration_seconds)}
-                  </div>
-                  {a.distance_meters > 0 && (
-                    <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
-                      {(a.distance_meters/1000).toFixed(1)}km
-                    </div>
-                  )}
-                </div>
+            {/* Resting HR chart */}
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",
+                textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>
+                Resting HR · last 14 days
               </div>
-            ))}
+              <MiniBar data={week14.filter(d=>d.resting_hr)} maxVal={100}
+                getVal={d=>d.resting_hr||0}
+                getColor={(_,i,len)=>i===len-1?domain.color:`${domain.color}66`}
+                getLabel={d=>d.date?.slice(5)}/>
+            </div>
+
+            {/* Daily log */}
+            <div>
+              <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",
+                textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Daily log</div>
+              {week7.map((d,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:10,
+                  padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
+                  <div style={{width:60,flexShrink:0}}>
+                    <div style={{fontSize:11,color:i===0?domain.color:C.inkFaint,
+                      fontFamily:"'Courier New',monospace"}}>{d.date?.slice(5)}</div>
+                  </div>
+                  <div style={{flex:1,display:"flex",gap:12,flexWrap:"wrap"}}>
+                    {d.steps&&<span style={{fontSize:11,color:C.inkMid,fontFamily:"'Courier New',monospace"}}>{d.steps.toLocaleString()} steps</span>}
+                    {d.stress_avg&&<span style={{fontSize:11,color:stressColor(d.stress_avg),fontFamily:"'Courier New',monospace"}}>stress {Math.round(d.stress_avg)}</span>}
+                    {d.resting_hr&&<span style={{fontSize:11,color:C.inkMid,fontFamily:"'Courier New',monospace"}}>{d.resting_hr}bpm</span>}
+                    {d.stress_qualifier&&<span style={{fontSize:10,color:C.inkFaint,fontStyle:"italic"}}>{d.stress_qualifier.toLowerCase().replace(/_/g," ")}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </>
+
+        // ── NUTRITION TAB ───────────────────────────────────────────────────
+        ) : (
+          <div style={{textAlign:"center",padding:"30px 0"}}>
+            <div style={{fontSize:32,marginBottom:12}}>🥗</div>
+            <div style={{fontSize:14,color:C.ink,fontFamily:"Georgia,serif",marginBottom:8}}>
+              Nutrition tracking coming soon
+            </div>
+            <div style={{fontSize:12,color:C.inkFaint,fontStyle:"italic",marginBottom:16}}>
+              Enable food logging in Garmin Connect to pull calorie and macro data here.
+            </div>
+            <div style={{fontSize:11,color:C.inkFaint,fontFamily:"'Courier New',monospace",
+              background:C.surface,border:`1px solid ${C.border}`,borderRadius:6,
+              padding:"10px 14px",textAlign:"left",maxWidth:300,margin:"0 auto"}}>
+              <div style={{marginBottom:4}}>Manual tracking options:</div>
+              <div>· Log meals in Garmin Connect</div>
+              <div>· Or connect MyFitnessPal to Garmin</div>
+            </div>
+          </div>
+        )
       )}
     </div>
   );
