@@ -3860,34 +3860,183 @@ Be concise. Estimate realistically. No markdown, no explanation.` }
 
       ) : tab==="sleep" ? (
         <div>
-          <div style={{textAlign:"center",padding:"20px 0 10px"}}>
-            <div style={{fontSize:13,color:C.inkFaint,fontStyle:"italic",marginBottom:8}}>
-              Sleep stage tracking not available on your device.
-            </div>
-            <div style={{fontSize:11,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",marginBottom:16}}>
-              Your Garmin doesn't report sleep stages (deviceRemCapable: false).<br/>
-              To unlock: Fenix 7, Forerunner 965, or Venu 3.
-            </div>
-            {/* Best practice guidelines */}
-            <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,
-              padding:16,textAlign:"left"}}>
-              <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
-                textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>Sleep targets</div>
-              {[
-                {label:"Total sleep",target:"7.5–9h",icon:"🌙"},
-                {label:"Deep sleep",target:"13–23% of total",icon:"💤"},
-                {label:"REM sleep",target:"20–25% of total",icon:"🧠"},
-                {label:"Bedtime consistency",target:"±30min variance",icon:"⏰"},
-              ].map((r,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:10,
-                  padding:"7px 0",borderBottom:i<3?`1px solid ${C.border}`:"none"}}>
-                  <span style={{fontSize:16,flexShrink:0}}>{r.icon}</span>
-                  <span style={{flex:1,fontSize:13,color:C.ink,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif"}}>{r.label}</span>
-                  <span style={{fontSize:11,color:domain.color,fontFamily:"'SF Mono','Fira Code',monospace"}}>{r.target}</span>
+          {/* Last night at a glance */}
+          {(() => {
+            const lastSleep = daily.find(d => d.sleep_hrs);
+            if (!lastSleep) return (
+              <div style={{textAlign:"center",padding:"24px 0",color:C.inkFaint,fontSize:13}}>
+                No sleep data yet — sync after wearing your watch overnight.
+              </div>
+            );
+            const deepPct  = lastSleep.deep_hrs  ? Math.round(lastSleep.deep_hrs  / lastSleep.sleep_hrs * 100) : null;
+            const remPct   = lastSleep.rem_hrs   ? Math.round(lastSleep.rem_hrs   / lastSleep.sleep_hrs * 100) : null;
+            const lightPct = lastSleep.light_hrs ? Math.round(lastSleep.light_hrs / lastSleep.sleep_hrs * 100) : null;
+            const scoreCol = lastSleep.sleep_score >= 80 ? C.green : lastSleep.sleep_score >= 60 ? C.gold : C.red;
+            const feedbackLabel = lastSleep.sleep_feedback
+              ? lastSleep.sleep_feedback.replace(/_/g," ").toLowerCase() : null;
+
+            // 7-day sleep averages
+            const sleepDays = daily.filter(d => d.sleep_hrs);
+            const avg7sleep = sleepDays.length ? sleepDays.slice(0,7).reduce((s,d)=>s+d.sleep_hrs,0)/Math.min(sleepDays.length,7) : null;
+            const avg7deep  = sleepDays.filter(d=>d.deep_hrs).slice(0,7);
+            const avgDeep   = avg7deep.length ? avg7deep.reduce((s,d)=>s+d.deep_hrs,0)/avg7deep.length : null;
+            const avg7rem   = sleepDays.filter(d=>d.rem_hrs).slice(0,7);
+            const avgRem    = avg7rem.length ? avg7rem.reduce((s,d)=>s+d.rem_hrs,0)/avg7rem.length : null;
+            const avg7score = sleepDays.filter(d=>d.sleep_score).slice(0,7);
+            const avgScore  = avg7score.length ? Math.round(avg7score.reduce((s,d)=>s+d.sleep_score,0)/avg7score.length) : null;
+
+            return (
+              <>
+                {/* Score + date */}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
+                  marginBottom:16,paddingBottom:16,borderBottom:`1px solid ${C.border}`}}>
+                  <div>
+                    <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                      textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:4}}>Last night · {lastSleep.date}</div>
+                    {feedbackLabel && (
+                      <div style={{fontSize:11,color:scoreCol,fontFamily:"'SF Mono','Fira Code',monospace"}}>{feedbackLabel}</div>
+                    )}
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:32,fontWeight:700,color:scoreCol,lineHeight:1}}>{lastSleep.sleep_score||"—"}</div>
+                    <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>sleep score</div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
+
+                {/* Ring gauges — total, deep, REM, light */}
+                <div style={{display:"flex",justifyContent:"space-around",
+                  paddingBottom:20,marginBottom:18,borderBottom:`1px solid ${C.border}`}}>
+                  <RingGauge value={lastSleep.sleep_hrs||0} max={9} size={82} stroke={7}
+                    color={scoreColor(lastSleep.sleep_hrs,6,7.5)}
+                    label="Total" sub={lastSleep.sleep_hrs?`${lastSleep.sleep_hrs}h`:"—"}
+                    center={<span style={{fontSize:15,fontWeight:700,color:C.ink}}>{lastSleep.sleep_hrs||"—"}</span>}/>
+                  <RingGauge value={deepPct||0} max={25} size={82} stroke={7}
+                    color={scoreColor(deepPct,13,20)}
+                    label="Deep" sub={lastSleep.deep_hrs?`${lastSleep.deep_hrs}h`:"—"}
+                    center={<span style={{fontSize:13,fontWeight:700,color:C.ink}}>{deepPct!=null?deepPct+"%":"—"}</span>}/>
+                  <RingGauge value={remPct||0} max={30} size={82} stroke={7}
+                    color={scoreColor(remPct,15,21)}
+                    label="REM" sub={lastSleep.rem_hrs?`${lastSleep.rem_hrs}h`:"—"}
+                    center={<span style={{fontSize:13,fontWeight:700,color:C.ink}}>{remPct!=null?remPct+"%":"—"}</span>}/>
+                  <RingGauge value={lastSleep.avg_spo2||0} max={100} size={82} stroke={7}
+                    color={scoreColor(lastSleep.avg_spo2,93,96)}
+                    label="SpO₂" sub={lastSleep.avg_spo2?`${lastSleep.avg_spo2}%`:"—"}
+                    center={<span style={{fontSize:13,fontWeight:700,color:C.ink}}>{lastSleep.avg_spo2||"—"}</span>}/>
+                </div>
+
+                {/* Sleep stage bar */}
+                {(deepPct||remPct||lightPct) && (
+                  <div style={{marginBottom:18,paddingBottom:18,borderBottom:`1px solid ${C.border}`}}>
+                    <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                      textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>Stage breakdown</div>
+                    <div style={{display:"flex",height:10,borderRadius:5,overflow:"hidden",gap:1,marginBottom:8}}>
+                      {deepPct  && <div style={{width:`${deepPct}%`, background:"#3b82f6"}}/>}
+                      {remPct   && <div style={{width:`${remPct}%`,  background:"#8b5cf6"}}/>}
+                      {lightPct && <div style={{width:`${lightPct}%`,background:"#94a3b8"}}/>}
+                    </div>
+                    <div style={{display:"flex",gap:16}}>
+                      {[["Deep",deepPct,"#3b82f6",lastSleep.deep_hrs],
+                        ["REM",remPct,"#8b5cf6",lastSleep.rem_hrs],
+                        ["Light",lightPct,"#94a3b8",lastSleep.light_hrs]].map(([l,p,c,h])=>p!=null&&(
+                        <div key={l} style={{display:"flex",alignItems:"center",gap:5}}>
+                          <div style={{width:8,height:8,borderRadius:2,background:c,flexShrink:0}}/>
+                          <span style={{fontSize:11,color:C.inkMid,fontFamily:"'SF Mono','Fira Code',monospace"}}>
+                            {l} {p}% · {h}h
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Vitals during sleep */}
+                {(lastSleep.avg_hr_sleep || lastSleep.avg_respiration || lastSleep.avg_spo2) && (
+                  <div style={{display:"flex",gap:16,flexWrap:"wrap",
+                    marginBottom:18,paddingBottom:18,borderBottom:`1px solid ${C.border}`}}>
+                    {lastSleep.avg_hr_sleep && (
+                      <div>
+                        <div style={{fontSize:9,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                          textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>HR during sleep</div>
+                        <div style={{fontSize:20,fontWeight:700,color:C.ink}}>{Math.round(lastSleep.avg_hr_sleep)}<span style={{fontSize:11,color:C.inkFaint,marginLeft:2}}>bpm</span></div>
+                      </div>
+                    )}
+                    {lastSleep.avg_respiration && (
+                      <div>
+                        <div style={{fontSize:9,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                          textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>Respiration</div>
+                        <div style={{fontSize:20,fontWeight:700,color:C.ink}}>{lastSleep.avg_respiration}<span style={{fontSize:11,color:C.inkFaint,marginLeft:2}}>br/min</span></div>
+                      </div>
+                    )}
+                    {lastSleep.avg_spo2 && (
+                      <div>
+                        <div style={{fontSize:9,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                          textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>SpO₂</div>
+                        <div style={{fontSize:20,fontWeight:700,color:scoreColor(lastSleep.avg_spo2,93,96)}}>{lastSleep.avg_spo2}<span style={{fontSize:11,color:C.inkFaint,marginLeft:2}}>%</span></div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 7-day sleep score trend */}
+                {sleepDays.length > 1 && (
+                  <div style={{marginBottom:18,paddingBottom:18,borderBottom:`1px solid ${C.border}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                      <span style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                        textTransform:"uppercase",letterSpacing:"0.07em"}}>Sleep score · 7 nights</span>
+                      {avgScore && <span style={{fontSize:10,color:scoreColor(avgScore,60,80),fontFamily:"'SF Mono','Fira Code',monospace"}}>avg {avgScore}</span>}
+                    </div>
+                    <SparkLine data={[...sleepDays.slice(0,7)].reverse().map(d=>d.sleep_score||0)}
+                      color={scoreColor(avgScore,60,80)} height={40}/>
+                  </div>
+                )}
+
+                {/* 7-day averages */}
+                <div style={{marginBottom:18}}>
+                  <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                    textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:10}}>7-day averages</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:16}}>
+                    {[
+                      {label:"Avg sleep",  val:avg7sleep, fmt: v=>`${v.toFixed(1)}h`, color:scoreColor(avg7sleep,6,7.5)},
+                      {label:"Avg deep",   val:avgDeep,   fmt: v=>`${v.toFixed(1)}h`, color:scoreColor(avgDeep,0.9,1.5)},
+                      {label:"Avg REM",    val:avgRem,    fmt: v=>`${v.toFixed(1)}h`, color:scoreColor(avgRem,1.2,1.8)},
+                      {label:"Avg score",  val:avgScore,  fmt: v=>`${v}`,             color:scoreColor(avgScore,60,80)},
+                    ].filter(m=>m.val).map((m,i)=>(
+                      <div key={i}>
+                        <div style={{fontSize:9,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                          textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>{m.label}</div>
+                        <div style={{fontSize:20,fontWeight:700,color:m.color}}>{m.fmt(m.val)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Nightly log */}
+                {sleepDays.length > 1 && (
+                  <div>
+                    <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                      textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>Nightly log</div>
+                    {sleepDays.slice(0,7).map((d,i)=>(
+                      <div key={i} style={{display:"flex",alignItems:"center",gap:10,
+                        padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
+                        <div style={{width:54,flexShrink:0,fontSize:10,
+                          color:i===0?domain.color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>{d.date?.slice(5)}</div>
+                        <div style={{flex:1,display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
+                          {d.sleep_hrs && <span style={{fontSize:11,color:C.ink,fontFamily:"'SF Mono','Fira Code',monospace"}}>{d.sleep_hrs}h</span>}
+                          {d.deep_hrs  && <span style={{fontSize:10,color:"#3b82f6",fontFamily:"'SF Mono','Fira Code',monospace"}}>D:{d.deep_hrs}h</span>}
+                          {d.rem_hrs   && <span style={{fontSize:10,color:"#8b5cf6",fontFamily:"'SF Mono','Fira Code',monospace"}}>R:{d.rem_hrs}h</span>}
+                          {d.avg_spo2  && <span style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>SpO₂:{d.avg_spo2}%</span>}
+                        </div>
+                        {d.sleep_score && (
+                          <div style={{fontSize:13,fontWeight:700,color:scoreColor(d.sleep_score,60,80),
+                            fontFamily:"'SF Mono','Fira Code',monospace",flexShrink:0}}>{d.sleep_score}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
 
       ) : tab==="health" ? (
