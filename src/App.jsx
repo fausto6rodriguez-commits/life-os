@@ -1121,9 +1121,15 @@ function TodoEditRow({ t, domainColor, todos, setTodos, setEditingTodo }) {
 }
 
 // Keyboard handler for note contentEditable areas
+// - Cmd/Ctrl+B/I/U: bold/italic/underline
 // - Tab: indent (or outdent with Shift)
 // - * + Space: convert to bullet list
 function noteKeyHandler(e) {
+  if (e.metaKey || e.ctrlKey) {
+    if (e.key === "b" || e.key === "B") { e.preventDefault(); document.execCommand("bold"); return; }
+    if (e.key === "i" || e.key === "I") { e.preventDefault(); document.execCommand("italic"); return; }
+    if (e.key === "u" || e.key === "U") { e.preventDefault(); document.execCommand("underline"); return; }
+  }
   if (e.key === "Tab") {
     e.preventDefault();
     if (e.shiftKey) {
@@ -1153,6 +1159,61 @@ function noteKeyHandler(e) {
       document.execCommand("insertUnorderedList");
     }
   }
+}
+
+function MilestoneEditRow({ m, accentColor, onSave, onCancel }) {
+  const textRef  = useRef(null);
+  const ownerRef = useRef(null);
+  const [dueRaw, setDueRaw]     = useState(m.dueRaw || "");
+  const [startRaw, setStartRaw] = useState(m.startRaw || "");
+  return (
+    <div style={{ padding:"10px 12px", border:`1.5px solid ${accentColor}44`,
+      borderRadius:6, background:C.caqiLight+"33", marginBottom:4 }}>
+      <input ref={textRef} dir="ltr" defaultValue={m.text} autoFocus
+        style={{ width:"100%", background:"transparent", border:"none",
+          borderBottom:`1px solid ${accentColor}`, color:C.ink, fontSize:13,
+          fontFamily:"Georgia, serif", fontStyle:"italic",
+          padding:"3px 0", outline:"none", boxSizing:"border-box", marginBottom:8 }} />
+      <div style={{ display:"flex", gap:8, marginBottom:8 }}>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+            textTransform:"uppercase", marginBottom:3 }}>Start</div>
+          <input type="date" value={startRaw} onChange={e => setStartRaw(e.target.value)}
+            style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`,
+              borderRadius:4, color:C.inkMid, fontSize:11,
+              fontFamily:"'Courier New', monospace", padding:"3px 6px", outline:"none" }} />
+        </div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+            textTransform:"uppercase", marginBottom:3 }}>Due</div>
+          <input type="date" value={dueRaw} onChange={e => setDueRaw(e.target.value)}
+            style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`,
+              borderRadius:4, color:C.inkMid, fontSize:11,
+              fontFamily:"'Courier New', monospace", padding:"3px 6px", outline:"none" }} />
+        </div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+            textTransform:"uppercase", marginBottom:3 }}>Owner</div>
+          <input ref={ownerRef} dir="ltr" defaultValue={m.owner || ""}
+            style={{ width:"100%", background:"transparent", border:"none",
+              borderBottom:`1px solid ${C.border}`, color:C.inkMid, fontSize:11,
+              fontFamily:"'Courier New', monospace", padding:"3px 0", outline:"none" }} />
+        </div>
+      </div>
+      <div style={{ display:"flex", gap:8 }}>
+        <button onClick={() => {
+          const text  = textRef.current?.value?.trim() || m.text;
+          const owner = ownerRef.current?.value || m.owner;
+          const due   = dueRaw ? new Date(dueRaw).toLocaleDateString("en-US",{month:"short",day:"numeric"}) : m.due;
+          onSave({ text, due, dueRaw, startRaw, owner });
+        }} style={{ background:accentColor, border:"none", borderRadius:4, color:"#fff",
+          fontSize:11, padding:"3px 12px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Save</button>
+        <button onClick={onCancel}
+          style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
+            color:C.inkFaint, fontSize:11, padding:"3px 8px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
+      </div>
+    </div>
+  );
 }
 
 function GranolaPanel({ meetings, loading, importing, onSelect, onClose }) {
@@ -1493,11 +1554,108 @@ function WorkDomainView({ domain, onUpdate }) {
         <div style={{ flex: 1, height: 1, background: `linear-gradient(to left, transparent, ${C.borderMid})` }} />
       </div>
       <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
-        {[1,2,3,4,5].map(v => (
-          <div key={v} onClick={() => onUpdate({ ...domain, rating: v })} style={{
-            width: 10, height: 10, borderRadius: "50%",
-            background: v <= domain.rating ? domain.color : C.border, cursor: "pointer" }} />
-        ))}
+        {(() => {
+          // ── WORK HEALTH SCORE ALGORITHM ───────────────────────────────────
+          const now = new Date();
+          const msPerDay = 86400000;
+          const daysSince = (dateStr) => {
+            if (!dateStr) return 999;
+            const d = new Date(dateStr);
+            return isNaN(d) ? 999 : Math.floor((now - d) / msPerDay);
+          };
+
+          // 1. TODO VELOCITY (0–100)
+          const allTodos = domain.todos || [];
+          const weekTodos = allTodos.filter(t => t.horizon === "this week");
+          const doneTodos = allTodos.filter(t => t.done);
+          const doneRecent = doneTodos.filter(t => daysSince(t.doneAt) <= 7).length;
+          const doneLastWeek = doneTodos.filter(t => { const d = daysSince(t.doneAt); return d > 7 && d <= 14; }).length;
+          const completionRate = weekTodos.length > 0 ? (doneRecent / Math.max(weekTodos.length, 1)) : 0;
+          const velocityTrend = doneRecent >= doneLastWeek ? 1 : -1;
+          const todoScore = Math.min(100, Math.round(
+            (completionRate * 60) +                          // completion rate weighted 60%
+            (Math.min(doneRecent, 10) / 10 * 30) +          // raw volume weighted 30%
+            (velocityTrend > 0 ? 10 : 0)                    // trend bonus 10%
+          ));
+
+          // 2. PROJECT MOMENTUM (0–100)
+          const projects = domain.projects || [];
+          const activeProjects = projects.filter(p => p.status === "active");
+          let projectScore = 50; // default neutral
+          if (activeProjects.length > 0) {
+            const projScores = activeProjects.map(p => {
+              const milestones = p.milestones || [];
+              const parents = milestones.filter(m => !m.parentId);
+              if (parents.length === 0) return 50;
+              const milestoneScores = parents.map(m => {
+                const children = milestones.filter(c => c.parentId === m.id);
+                const subPct = children.length > 0
+                  ? Math.round(children.filter(c => c.done).length / children.length * 100)
+                  : (m.done ? 100 : 0);
+                let datePct = 0;
+                if (m.dueRaw) {
+                  const due = new Date(m.dueRaw);
+                  const start = m.startRaw ? new Date(m.startRaw) : new Date(now.getFullYear(), 0, 1);
+                  datePct = Math.min(100, Math.max(0, Math.round((now - start) / (due - start) * 100)));
+                }
+                // On track = subPct >= datePct, bonus for ahead of schedule
+                const delta = subPct - datePct;
+                return Math.min(100, Math.max(0, 50 + delta));
+              });
+              const avgMilestone = milestoneScores.reduce((a,b) => a+b, 0) / milestoneScores.length;
+              // Recent notes boost (+10 if note in last 7 days)
+              const recentNote = (p.notes||[]).some(n => daysSince(n.date) <= 7);
+              return Math.min(100, avgMilestone + (recentNote ? 10 : 0));
+            });
+            projectScore = Math.round(projScores.reduce((a,b) => a+b, 0) / projScores.length);
+          }
+
+          // 3. PEOPLE ENGAGEMENT (0–100)
+          const calls = domain.calls || [];
+          const contacts = domain.contacts || [];
+          const recentCalls = calls.filter(c => daysSince(c.date) <= 7);
+          const prevCalls = calls.filter(c => { const d = daysSince(c.date); return d > 7 && d <= 14; });
+          const uniqueRecent = new Set(recentCalls.map(c => c.contactId)).size;
+          const uniquePrev = new Set(prevCalls.map(c => c.contactId)).size;
+          const engagementTrend = uniqueRecent >= uniquePrev ? 1 : -1;
+          const followUpsDone = contacts.reduce((acc, c) => acc + (c.followUps||[]).filter(f => f.done).length, 0);
+          const followUpsTotal = contacts.reduce((acc, c) => acc + (c.followUps||[]).length, 0);
+          const fuRatio = followUpsTotal > 0 ? followUpsDone / followUpsTotal : 0.5;
+          const peopleScore = Math.min(100, Math.round(
+            (Math.min(uniqueRecent, 8) / 8 * 50) +          // unique contacts touched 50%
+            (fuRatio * 30) +                                 // follow-up completion 30%
+            (engagementTrend > 0 ? 20 : 0)                  // trend bonus 20%
+          ));
+
+          // COMPOSITE SCORE
+          const composite = Math.round((todoScore * 0.33) + (projectScore * 0.34) + (peopleScore * 0.33));
+          const dots = Math.max(1, Math.min(5, Math.ceil(composite / 20)));
+
+          // TREND COLOR: compare vs stored previous score
+          const prevScore = domain.prevWorkScore || composite;
+          const delta = composite - prevScore;
+          const trendColor = delta > 3 ? C.green : delta < -3 ? C.red : C.gold;
+
+          // Store score for next comparison (debounced via onUpdate would cause loops, use ref pattern)
+          // We display tooltip with breakdown on hover
+          return (
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+              <div style={{ display:"flex", gap:6 }}>
+                {[1,2,3,4,5].map(v => (
+                  <div key={v} style={{
+                    width: 10, height: 10, borderRadius: "50%",
+                    background: v <= dots ? trendColor : C.border,
+                    transition: "background 0.3s"
+                  }} />
+                ))}
+              </div>
+              <div style={{ fontSize:9, color:trendColor, fontFamily:"'Courier New', monospace",
+                opacity:0.7, letterSpacing:"0.05em" }}>
+                {composite}pts · {delta > 3 ? "▲" : delta < -3 ? "▼" : "—"} {todoScore}T / {projectScore}P / {peopleScore}E
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -2875,176 +3033,145 @@ Write in first person. Be concise. Plain text only.` }]
           placeholder="The one number that defines success"
           accentColor={domain.color} onCommit={updateProject} />
 
-        {/* Milestones — Gantt-style */}
+        {/* Milestones — Hierarchical Gantt */}
         <div style={{ margin:"16px 0" }}>
           <SectionRule label="milestones" color={domain.color} />
           {(project.milestones||[]).length === 0 && !addingMilestone && (
-            <div style={{ fontSize:12, color:C.inkFaint, fontStyle:"italic", padding:"8px 0" }}>No milestones yet.</div>
+            <div style={{ fontSize:12, color:C.inkFaint, fontStyle:"italic", padding:"4px 0" }}>No milestones yet.</div>
           )}
 
-          {/* Gantt rows */}
-          {(project.milestones||[]).map((m, i) => {
-            const total = (project.milestones||[]).length;
-            const pct = total > 1 ? (i / (total - 1)) * 100 : 0;
-            const isEditing = editingMilestoneId === m.id;
-
-            if (isEditing) return (
-              <div key={m.id} style={{ padding:"10px 0", borderBottom:`1px solid ${C.border}`,
-                borderLeft:`3px solid ${domain.color}`, paddingLeft:10,
-                background:C.caqiLight+"33" }}>
-                <input dir="ltr" defaultValue={m.text} autoFocus id={`medit-text-${m.id}`}
-                  style={{ width:"100%", background:"transparent", border:"none",
-                    borderBottom:`1px solid ${domain.color}`, color:C.ink, fontSize:13,
-                    fontFamily:"Georgia, serif", fontStyle:"italic",
-                    padding:"3px 0", outline:"none", boxSizing:"border-box", marginBottom:8 }} />
-                <div style={{ display:"flex", gap:8, marginBottom:8 }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
-                      textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Due date</div>
-                    <input type="date" id={`medit-due-${m.id}`}
-                      defaultValue={m.dueRaw || ""}
-                      style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`,
-                        borderRadius:4, color:C.inkMid, fontSize:12,
-                        fontFamily:"'Courier New', monospace", padding:"4px 6px", outline:"none" }} />
-                  </div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
-                      textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Owner</div>
-                    <input dir="ltr" id={`medit-owner-${m.id}`}
-                      defaultValue={m.owner || ""}
-                      style={{ width:"100%", background:"transparent", border:"none",
-                        borderBottom:`1px solid ${C.border}`, color:C.inkMid, fontSize:12,
-                        fontFamily:"'Courier New', monospace", padding:"3px 0", outline:"none" }} />
-                  </div>
-                </div>
-                <div style={{ display:"flex", gap:8 }}>
-                  <button onClick={() => {
-                    const text  = document.getElementById(`medit-text-${m.id}`)?.value || m.text;
-                    const raw   = document.getElementById(`medit-due-${m.id}`)?.value || "";
-                    const owner = document.getElementById(`medit-owner-${m.id}`)?.value || m.owner;
-                    const due   = raw ? new Date(raw).toLocaleDateString("en-US",{month:"short",day:"numeric"}) : m.due;
-                    updateProject("milestones",
-                      (project.milestones||[]).map(x => x.id===m.id ? { ...x, text, due, dueRaw:raw, owner } : x));
-                    setEditingMilestoneId(null);
-                  }} style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
-                    fontSize:11, padding:"3px 12px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Save</button>
-                  <button onClick={() => setEditingMilestoneId(null)}
-                    style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
-                      color:C.inkFaint, fontSize:11, padding:"3px 8px", cursor:"pointer", fontFamily:"inherit" }}>Cancel</button>
-                </div>
-              </div>
-            );
+          {(project.milestones||[]).filter(m => !m.parentId).map((parent) => {
+            const children = (project.milestones||[]).filter(m => m.parentId === parent.id);
+            const isCollapsed = parent.collapsed;
+            const isEditing = editingMilestoneId === parent.id;
+            const doneSubs = children.filter(c => c.done).length;
+            const totalSubs = children.length;
+            const subPct = totalSubs > 0 ? Math.round(doneSubs / totalSubs * 100) : (parent.done ? 100 : 0);
+            const todayMs = new Date();
+            let datePct = 0;
+            if (parent.dueRaw) {
+              const due = new Date(parent.dueRaw);
+              const start = parent.startRaw ? new Date(parent.startRaw) : new Date(todayMs.getFullYear(), 0, 1);
+              datePct = Math.min(100, Math.max(0, Math.round((todayMs - start) / (due - start) * 100)));
+            }
 
             return (
-              <div key={m.id} style={{ display:"flex", alignItems:"flex-start", gap:10,
-                padding:"10px 0", borderBottom:`1px solid ${C.border}` }}>
-                {/* Done toggle */}
-                <div onClick={() => updateProject("milestones",
-                  (project.milestones||[]).map(x => x.id===m.id ? { ...x, done:!x.done } : x))}
-                  style={{ width:16, height:16, borderRadius:"50%", flexShrink:0, marginTop:2,
-                    border:`2px solid ${m.done ? C.green : domain.color}`,
-                    background: m.done ? C.green : "transparent",
-                    cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                  {m.done && <span style={{ fontSize:9, color:"#fff", fontWeight:700 }}>✓</span>}
-                </div>
+              <div key={parent.id} style={{ marginBottom:2 }}>
+                {isEditing ? (
+                  <MilestoneEditRow m={parent} accentColor={domain.color}
+                    onSave={u => { updateProject("milestones",(project.milestones||[]).map(x=>x.id===parent.id?{...x,...u}:x)); setEditingMilestoneId(null); }}
+                    onCancel={() => setEditingMilestoneId(null)} />
+                ) : (
+                  <div style={{ padding:"4px 0" }}>
+                    {/* Single line: toggle + check + name + bar + meta + actions */}
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      {/* Collapse toggle */}
+                      <button onClick={() => updateProject("milestones",(project.milestones||[]).map(x=>x.id===parent.id?{...x,collapsed:!x.collapsed}:x))}
+                        style={{ background:"transparent", border:"none", color: children.length ? C.inkFaint : "transparent",
+                          cursor: children.length ? "pointer" : "default",
+                          fontSize:8, padding:0, flexShrink:0, width:10, lineHeight:1 }}>
+                        {children.length ? (isCollapsed ? "▶" : "▼") : ""}
+                      </button>
+                      {/* Square checkbox */}
+                      <div onClick={() => updateProject("milestones",(project.milestones||[]).map(x=>x.id===parent.id?{...x,done:!x.done}:x))}
+                        style={{ width:11, height:11, borderRadius:2, flexShrink:0,
+                          border:`1.5px solid ${parent.done ? C.green : C.borderMid}`,
+                          background: parent.done ? C.green : "transparent",
+                          cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                        {parent.done && <span style={{ fontSize:7, color:"#fff", lineHeight:1 }}>✓</span>}
+                      </div>
+                      {/* Name — fixed width so bars align */}
+                      <span style={{ fontSize:13, color: parent.done ? C.inkFaint : C.ink,
+                        fontFamily:"Georgia, serif",
+                        textDecoration: parent.done ? "line-through" : "none",
+                        width:140, flexShrink:0, overflow:"hidden",
+                        textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{parent.text}</span>
+                      {/* Progress bar — fixed width, always left-aligned */}
+                      <div style={{ width:80, flexShrink:0, position:"relative", height:3, background:C.border, borderRadius:2 }}>
+                        <div style={{ width:`${subPct}%`, height:"100%",
+                          background: domain.color, borderRadius:2, opacity:0.7 }} />
+                        {datePct > 0 && datePct < 100 && (
+                          <div style={{ position:"absolute", left:`${datePct}%`, top:-1,
+                            width:1, height:5, background:C.inkFaint, transform:"translateX(-50%)" }} />
+                        )}
+                      </div>
+                      {/* Meta */}
+                      <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace", flexShrink:0, whiteSpace:"nowrap" }}>
+                        {totalSubs > 0 ? `${doneSubs}/${totalSubs}` : (parent.due || "")}
+                      </span>
+                      {parent.owner && <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace", flexShrink:0 }}>{parent.owner}</span>}
+                      <div style={{ flex:1 }} />
+                      {/* Actions */}
+                      <button onClick={() => setEditingMilestoneId(parent.id)}
+                        style={{ background:"transparent", border:"none", color:C.inkFaint,
+                          cursor:"pointer", fontSize:9, padding:0, flexShrink:0, opacity:0.5 }}>✎</button>
+                      <button onClick={() => updateProject("milestones",(project.milestones||[]).filter(x=>x.id!==parent.id&&x.parentId!==parent.id))}
+                        style={{ background:"transparent", border:"none", color:C.inkFaint,
+                          cursor:"pointer", fontSize:11, padding:0, flexShrink:0, opacity:0.5 }}>×</button>
+                    </div>
 
-                {/* Content — tap to edit */}
-                <div onClick={() => setEditingMilestoneId(m.id)}
-                  style={{ flex:1, minWidth:0, cursor:"text" }}>
-                  <div style={{ fontSize:13, color: m.done ? C.inkFaint : C.ink,
-                    fontFamily:"Georgia, serif", fontStyle:"italic",
-                    textDecoration: m.done ? "line-through" : "none",
-                    marginBottom:4 }}>{m.text}</div>
+                    {/* Sub-milestones */}
+                    {!isCollapsed && children.map(child => (
+                      <div key={child.id}>
+                        {editingMilestoneId === child.id ? (
+                          <div style={{ paddingLeft:17 }}>
+                            <MilestoneEditRow m={child} accentColor={domain.color}
+                              onSave={u => { updateProject("milestones",(project.milestones||[]).map(x=>x.id===child.id?{...x,...u}:x)); setEditingMilestoneId(null); }}
+                              onCancel={() => setEditingMilestoneId(null)} />
+                          </div>
+                        ) : (
+                          <div style={{ display:"flex", alignItems:"center", gap:6,
+                            padding:"3px 0 3px 17px" }}>
+                            <div onClick={() => updateProject("milestones",(project.milestones||[]).map(x=>x.id===child.id?{...x,done:!x.done}:x))}
+                              style={{ width:9, height:9, borderRadius:1.5, flexShrink:0,
+                                border:`1px solid ${child.done ? C.green : C.borderMid}`,
+                                background: child.done ? C.green : "transparent",
+                                cursor:"pointer" }} />
+                            <span style={{ flex:1, fontSize:12, color: child.done ? C.inkFaint : C.inkMid,
+                              fontFamily:"Georgia, serif", fontStyle:"italic",
+                              textDecoration: child.done ? "line-through" : "none" }}>{child.text}</span>
+                            {child.due && <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace", flexShrink:0 }}>{child.due}</span>}
+                            {child.owner && <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace", flexShrink:0 }}>{child.owner}</span>}
+                            <button onClick={() => setEditingMilestoneId(child.id)}
+                              style={{ background:"transparent", border:"none", color:C.inkFaint,
+                                cursor:"pointer", fontSize:9, padding:0, opacity:0.5 }}>✎</button>
+                            <button onClick={() => updateProject("milestones",(project.milestones||[]).filter(x=>x.id!==child.id))}
+                              style={{ background:"transparent", border:"none", color:C.inkFaint,
+                                cursor:"pointer", fontSize:11, padding:0, opacity:0.5 }}>×</button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
 
-                  {/* Timeline bar */}
-                  <div style={{ height:3, background:C.border, borderRadius:2, marginBottom:4, position:"relative" }}>
-                    <div style={{ position:"absolute", left:`${pct}%`, top:-3, width:9, height:9,
-                      borderRadius:"50%", background: m.done ? C.green : domain.color,
-                      transform:"translateX(-50%)", border:`2px solid ${C.bg}` }} />
-                    {m.done && (
-                      <div style={{ width:`${pct}%`, height:"100%", background:C.green,
-                        borderRadius:2, opacity:0.5 }} />
+                    {/* Add sub */}
+                    {!isCollapsed && !addingMilestone?.parentId && (
+                      <button onClick={() => setAddingMilestone({ parentId: parent.id })}
+                        style={{ background:"transparent", border:"none", color:C.inkFaint,
+                          cursor:"pointer", fontSize:10, padding:"2px 0 2px 17px", display:"block",
+                          fontFamily:"Georgia, serif", fontStyle:"italic", opacity:0.6 }}>+ sub</button>
+                    )}
+                    {addingMilestone?.parentId === parent.id && (
+                      <div style={{ paddingLeft:17 }}>
+                        <AddMilestoneForm accentColor={domain.color}
+                          onCancel={() => setAddingMilestone(false)}
+                          onAdd={m => { updateProject("milestones",[...(project.milestones||[]),{...m,id:`m${Date.now()}`,done:false,parentId:parent.id}]); setAddingMilestone(false); }} />
+                      </div>
                     )}
                   </div>
-
-                  <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-                    {m.due && <span style={{ fontSize:10, color:C.inkFaint,
-                      fontFamily:"'Courier New', monospace" }}>📅 {m.due}</span>}
-                    {m.owner && <span style={{ fontSize:10, color:domain.color,
-                      fontFamily:"'Courier New', monospace" }}>👤 {m.owner}</span>}
-                  </div>
-                </div>
-
-                {/* Edit + Delete */}
-                <div style={{ display:"flex", gap:6, flexShrink:0 }}>
-                  <button onClick={() => setEditingMilestoneId(m.id)}
-                    style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
-                      borderRadius:3, color:C.inkFaint, fontSize:10, padding:"2px 7px",
-                      cursor:"pointer", fontFamily:"inherit" }}>edit</button>
-                  <button onClick={() => updateProject("milestones",
-                    (project.milestones||[]).filter(x => x.id!==m.id))}
-                    style={{ background:"transparent", border:"none", color:C.inkFaint,
-                      cursor:"pointer", fontSize:13, padding:0 }}>×</button>
-                </div>
+                )}
               </div>
             );
           })}
 
-          {/* Add milestone */}
-          {addingMilestone ? (
-            <AddMilestoneForm
-              accentColor={domain.color}
+          {addingMilestone === true ? (
+            <AddMilestoneForm accentColor={domain.color}
               onCancel={() => setAddingMilestone(false)}
-              onAdd={(m) => {
-                updateProject("milestones", [...(project.milestones||[]),
-                  { ...m, id:`m${Date.now()}`, done:false }]);
-                setAddingMilestone(false);
-              }}
-            />
+              onAdd={m => { updateProject("milestones",[...(project.milestones||[]),{...m,id:`m${Date.now()}`,done:false}]); setAddingMilestone(false); }} />
           ) : (
             <button onClick={() => setAddingMilestone(true)}
-              style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
-                borderRadius:6, padding:"7px", color:C.inkFaint, fontSize:11,
-                cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic", marginTop:6 }}>+ Add milestone</button>
-          )}
-        </div>
-
-        {/* Weekly status */}
-        <div style={{ margin:"16px 0" }}>
-          <SectionRule label="weekly status" color={domain.color} />
-          {(project.weeklyStatus||[]).length === 0 && !addingStatus && (
-            <div style={{ fontSize:12, color:C.inkFaint, fontStyle:"italic", padding:"8px 0" }}>No status updates yet.</div>
-          )}
-          {(project.weeklyStatus||[]).map(s => (
-            <div key={s.id} style={{ padding:"10px 0", borderBottom:`1px solid ${C.border}` }}>
-              <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
-                marginBottom:4 }}>{s.date}</div>
-              <div style={{ fontSize:13, color:C.inkMid, fontFamily:"Georgia, serif",
-                fontStyle:"italic", lineHeight:1.6 }}>{s.text}</div>
-              <button onClick={() => updateProject("weeklyStatus",
-                (project.weeklyStatus||[]).filter(x => x.id!==s.id))}
-                style={{ background:"transparent", border:"none", color:C.inkFaint,
-                  cursor:"pointer", fontSize:10, padding:"4px 0 0",
-                  fontFamily:"'Courier New', monospace" }}>delete</button>
-            </div>
-          ))}
-          {addingStatus ? (
-            <AddStatusForm
-              projectName={project.name}
-              onCancel={() => setAddingStatus(false)}
-              onAdd={(text) => {
-                updateProject("weeklyStatus", [
-                  { id:`ws${Date.now()}`, date:today, text },
-                  ...(project.weeklyStatus||[])
-                ]);
-                setAddingStatus(false);
-              }}
-            />
-          ) : (
-            <button onClick={() => setAddingStatus(true)}
-              style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
-                borderRadius:6, padding:"7px", color:C.inkFaint, fontSize:11,
-                cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic", marginTop:6 }}>+ Add this week's status</button>
+              style={{ background:"transparent", border:"none", color:C.inkFaint,
+                fontSize:11, padding:"6px 0 0", cursor:"pointer",
+                fontFamily:"Georgia, serif", fontStyle:"italic" }}>+ milestone</button>
           )}
         </div>
 
@@ -3188,7 +3315,7 @@ Write in first person. Be concise. Plain text only.` }]
                         <div ref={editProjNoteRef} dir="ltr" contentEditable
                           suppressContentEditableWarning onKeyDown={noteKeyHandler}
                           dangerouslySetInnerHTML={{ __html: n.html }}
-                          style={{ padding:10, minHeight:80, color:C.ink, fontSize:13,
+                          style={{ padding:10, minHeight:80, color:C.ink, background:"#fff", fontSize:13,
                             fontFamily:"Georgia, serif", lineHeight:1.7, outline:"none",
                             direction:"ltr", textAlign:"left" }} />
                         <div style={{ display:"flex", gap:6, padding:"5px 10px",
@@ -3240,7 +3367,7 @@ Write in first person. Be concise. Plain text only.` }]
             </div>
             <div ref={projNoteRef} dir="ltr" contentEditable suppressContentEditableWarning
               onKeyDown={noteKeyHandler} data-placeholder="Add a note…"
-              style={{ minHeight:70, padding:10, outline:"none", fontSize:13,
+              style={{ minHeight:70, padding:10, outline:"none", fontSize:13, background:"#fff",
                 fontFamily:"Georgia, serif", lineHeight:1.7, color:C.ink, direction:"ltr" }} />
             <div style={{ padding:"5px 10px", borderTop:`1px solid ${C.border}`, textAlign:"right" }}>
               <button onClick={addProjectNote}
@@ -3439,10 +3566,237 @@ Write in first person. Be concise. Plain text only.` }]
 }
 
 // ── DOMAIN VIEW ───────────────────────────────────────────────────────────────
+// ── BODY DOMAIN VIEW ─────────────────────────────────────────────────────────
+function BodyDomainView({ domain, onUpdate, onBack }) {
+  const [daily, setDaily]       = useState([]);
+  const [activities, setActs]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [syncing, setSyncing]   = useState(false);
+  const [lastSync, setLastSync] = useState(null);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const headers = {
+        "apikey": SUPA_KEY, "Authorization": `Bearer ${SUPA_KEY}`
+      };
+      const [d, a] = await Promise.all([
+        fetch(`${SUPA_URL}/rest/v1/health_daily?order=date.desc&limit=14`, { headers }).then(r => r.json()),
+        fetch(`${SUPA_URL}/rest/v1/health_activities?order=date.desc&limit=20`, { headers }).then(r => r.json()),
+      ]);
+      if (Array.isArray(d)) setDaily(d);
+      if (Array.isArray(a)) setActs(a);
+      setLastSync(new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}));
+    } catch(e) { console.error("Body load failed:", e); }
+    setLoading(false);
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  const today = daily[0];
+  const yesterday = daily[1];
+
+  const fmt = (v, unit="", decimals=0) =>
+    v != null ? `${typeof v === "number" ? v.toFixed(decimals) : v}${unit}` : "—";
+
+  const scoreColor = (v, low, high) =>
+    v == null ? C.inkFaint : v >= high ? C.green : v >= low ? C.gold : C.red;
+
+  const stressColor = (v) =>
+    v == null ? C.inkFaint : v < 26 ? C.green : v < 51 ? C.gold : C.red;
+
+  // Weekly aggregates
+  const week = daily.slice(0, 7);
+  const weekSteps = week.reduce((s, d) => s + (d.steps||0), 0);
+  const weekRuns = activities.filter(a => a.activity_type === "running").slice(0, 7);
+  const weekRunKm = weekRuns.reduce((s, a) => s + ((a.distance_meters||0)/1000), 0);
+  const avgStress = week.length ? Math.round(week.reduce((s,d) => s+(d.stress_avg||0), 0) / week.length) : null;
+
+  // Mini bar chart for steps (last 7 days)
+  const maxSteps = Math.max(...week.map(d => d.steps||0), 1);
+
+  const actIcon = (type) => ({
+    running: "🏃", strength_training: "💪", cycling: "🚴",
+    swimming: "🏊", meditation: "🧘", walking: "🚶", yoga: "🧘",
+  }[type] || "⚡");
+
+  const formatDuration = (secs) => {
+    if (!secs) return "—";
+    const m = Math.round(secs/60);
+    return m >= 60 ? `${Math.floor(m/60)}h${m%60 ? m%60+"m" : ""}` : `${m}min`;
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ paddingTop:8, paddingBottom:12, textAlign:"center" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, justifyContent:"center", marginBottom:6 }}>
+          <div style={{ flex:1, height:1, background:`linear-gradient(to right, transparent, ${domain.color}66)` }} />
+          <span style={{ fontSize:22, color:domain.color }}>{domain.glyph}</span>
+          <span style={{ fontSize:28, color:C.navy, fontWeight:700, letterSpacing:"-0.3px" }}>Body</span>
+          <div style={{ flex:1, height:1, background:`linear-gradient(to left, transparent, ${domain.color}66)` }} />
+        </div>
+        <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:10 }}>
+          {lastSync && <span style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>synced {lastSync}</span>}
+          <button onClick={loadData} disabled={loading}
+            style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
+              borderRadius:4, color:C.inkFaint, fontSize:10, padding:"2px 8px",
+              cursor:loading?"default":"pointer", fontFamily:"inherit" }}>
+            {loading ? "…" : "↻"}
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign:"center", padding:"30px 0", fontSize:13, color:C.inkFaint, fontStyle:"italic" }}>
+          Loading from Garmin…
+        </div>
+      ) : daily.length === 0 ? (
+        <div style={{ textAlign:"center", padding:"30px 0" }}>
+          <div style={{ fontSize:13, color:C.inkFaint, fontStyle:"italic", marginBottom:8 }}>No data yet.</div>
+          <div style={{ fontSize:11, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+            Run python3 ~/garmin_sync.py to sync
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* TODAY snapshot */}
+          {today && (
+            <div style={{ marginBottom:16, paddingBottom:16, borderBottom:`1px solid ${C.border}` }}>
+              <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
+                textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:10 }}>
+                Today · {today.date}
+              </div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:16 }}>
+                {[
+                  { label:"Steps", value: today.steps?.toLocaleString(), unit:"", color: scoreColor(today.steps, 5000, 10000) },
+                  { label:"Calories", value: today.total_calories ? Math.round(today.total_calories) : null, unit:"kcal" },
+                  { label:"Active cal", value: today.active_calories ? Math.round(today.active_calories) : null, unit:"kcal" },
+                  { label:"Stress", value: today.stress_avg ? Math.round(today.stress_avg) : null, unit:"", color: stressColor(today.stress_avg) },
+                  { label:"Resting HR", value: today.resting_hr, unit:"bpm" },
+                ].map((m,i) => (
+                  <div key={i}>
+                    <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+                      textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:2 }}>{m.label}</div>
+                    <div style={{ fontSize:20, color: m.color || C.ink,
+                      fontFamily:"Georgia, serif", fontWeight:600, lineHeight:1 }}>
+                      {fmt(m.value, m.unit)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {today.stress_qualifier && (
+                <div style={{ marginTop:8, fontSize:10, color:stressColor(today.stress_avg),
+                  fontFamily:"'Courier New', monospace" }}>
+                  {today.stress_qualifier.toLowerCase().replace(/_/g," ")}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEPS — 7-day bar chart */}
+          <div style={{ marginBottom:16, paddingBottom:16, borderBottom:`1px solid ${C.border}` }}>
+            <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+              textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>Steps · last 7 days</div>
+            <div style={{ display:"flex", gap:4, alignItems:"flex-end", height:48 }}>
+              {[...week].reverse().map((d, i) => {
+                const pct = (d.steps||0) / maxSteps;
+                const isToday = i === week.length - 1;
+                return (
+                  <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
+                    <div style={{ width:"100%", height: Math.max(2, Math.round(pct*40)),
+                      background: isToday ? domain.color : `${domain.color}66`,
+                      borderRadius:"2px 2px 0 0" }} />
+                    <div style={{ fontSize:8, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+                      {d.date?.slice(5)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", marginTop:6 }}>
+              <span style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+                Week total: {weekSteps.toLocaleString()}
+              </span>
+              <span style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+                Avg stress: <span style={{ color:stressColor(avgStress) }}>{avgStress ?? "—"}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* STRESS trend */}
+          <div style={{ marginBottom:16, paddingBottom:16, borderBottom:`1px solid ${C.border}` }}>
+            <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+              textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>Stress · last 7 days</div>
+            <div style={{ display:"flex", gap:4, alignItems:"flex-end", height:32 }}>
+              {[...week].reverse().map((d, i) => {
+                const pct = (d.stress_avg||0) / 100;
+                return (
+                  <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
+                    <div style={{ width:"100%", height: Math.max(2, Math.round(pct*28)),
+                      background: stressColor(d.stress_avg),
+                      borderRadius:"2px 2px 0 0", opacity:0.8 }} />
+                    <div style={{ fontSize:8, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+                      {d.stress_avg ? Math.round(d.stress_avg) : "—"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ACTIVITIES */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+              <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+                textTransform:"uppercase", letterSpacing:"0.08em" }}>Recent activities</div>
+              {weekRunKm > 0 && (
+                <span style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace" }}>
+                  {weekRunKm.toFixed(1)}km this week
+                </span>
+              )}
+            </div>
+            {activities.slice(0, 10).map((a, i) => (
+              <div key={i} style={{ display:"flex", alignItems:"center", gap:10,
+                padding:"8px 0", borderBottom:`1px solid ${C.border}` }}>
+                <span style={{ fontSize:16, flexShrink:0 }}>{actIcon(a.activity_type)}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, color:C.ink, fontFamily:"Georgia, serif",
+                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                    {a.name || a.activity_type?.replace(/_/g," ")}
+                  </div>
+                  <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+                    {a.date}
+                    {a.avg_hr ? ` · ${Math.round(a.avg_hr)}bpm` : ""}
+                    {a.avg_pace_min_per_km ? ` · ${a.avg_pace_min_per_km.toFixed(2)}min/km` : ""}
+                  </div>
+                </div>
+                <div style={{ textAlign:"right", flexShrink:0 }}>
+                  <div style={{ fontSize:12, color:C.inkMid, fontFamily:"'Courier New', monospace" }}>
+                    {formatDuration(a.duration_seconds)}
+                  </div>
+                  {a.distance_meters > 0 && (
+                    <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+                      {(a.distance_meters/1000).toFixed(1)}km
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 function DomainView({ domain, onUpdate, onBack }) {
   // Work has its own specialized view
   if (domain.id === "work") {
     return <WorkDomainView domain={domain} onUpdate={onUpdate} />;
+  }
+  // Body has its own specialized view with Terra integration
+  if (domain.id === "body") {
+    return <BodyDomainView domain={domain} onUpdate={onUpdate} onBack={onBack} />;
   }
   const [tab, setTab] = useState("overview");
   const TABS = [
