@@ -1,5 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 
+// Inject Inter font
+if (typeof document !== "undefined" && !document.getElementById("inter-font")) {
+  const link = document.createElement("link");
+  link.id = "inter-font";
+  link.rel = "stylesheet";
+  link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap";
+  document.head.appendChild(link);
+}
+
 // ── SUPABASE ──────────────────────────────────────────────────────────────────
 const SUPA_URL = "https://qghuysyxvjukiwapbijh.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnaHV5c3l4dmp1a2l3YXBiaWpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NjAzODgsImV4cCI6MjA5NTMzNjM4OH0.dMmv4TzmVXU-eKRTuoKdFG8D2v1Psb9rqyVHuRLkfdo";
@@ -216,20 +225,22 @@ async function loadFromDb() {
 }
 
 const C = {
-  bg:        "#f7f5f0",
+  bg:        "#f1f5f9",
   surface:   "#ffffff",
-  border:    "#e4dfd8",
-  borderMid: "#cec9c0",
-  navy:      "#1a2b3c",
-  caqi:      "#4e9e8e",
-  caqiLight: "#e6f4f2",
-  ink:       "#1a2b3c",
-  inkMid:    "#3d4f5f",
-  inkLight:  "#7a8a96",
-  inkFaint:  "#b8c4cc",
-  green:     "#3d8a5a",
-  red:       "#b84040",
-  gold:      "#b8842a",
+  border:    "#e2e8f0",
+  borderMid: "#cbd5e1",
+  navy:      "#0f172a",
+  caqi:      "#0d9488",
+  caqiLight: "#f0fdfa",
+  ink:       "#0f172a",
+  inkMid:    "#334155",
+  inkLight:  "#64748b",
+  inkFaint:  "#94a3b8",
+  green:     "#059669",
+  red:       "#dc2626",
+  gold:      "#d97706",
+  shadow:    "0 1px 3px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.06)",
+  shadowMd:  "0 4px 6px rgba(15,23,42,0.07), 0 2px 4px rgba(15,23,42,0.06)",
 };
 
 const QUARTERS = ["Q1", "Q2", "Q3", "Q4"];
@@ -248,7 +259,7 @@ const DOMAINS = [
   {
     id: "body", label: "Body", glyph: "◎",
     question: "Am I well?",
-    color: "#4e9e8e", colorLight: "#e6f4f2",
+    color: "#0d9488", colorLight: "#f0fdfa",
     identity: "I treat my body as a precision instrument. Physical integrity is the foundation of everything else.",
     pillars: BODY_PILLARS,
     goals: [
@@ -285,7 +296,7 @@ const DOMAINS = [
   {
     id: "mind", label: "Mind", glyph: "◈",
     question: "Am I growing?",
-    color: "#3d6ea8", colorLight: "#e8eff8",
+    color: "#3b82f6", colorLight: "#eff6ff",
     identity: "I read widely, think slowly, and resist reactive consumption. I build mental models, not just opinions.",
     pillars: null,
     goals: [
@@ -309,7 +320,7 @@ const DOMAINS = [
   {
     id: "soul", label: "Soul", glyph: "◇",
     question: "Am I aligned?",
-    color: "#7a5aaa", colorLight: "#f0ebfa",
+    color: "#8b5cf6", colorLight: "#f5f3ff",
     identity: "My decisions are legible to my values even when they're costly. I am building a life I can account for.",
     pillars: null,
     goals: [
@@ -333,7 +344,7 @@ const DOMAINS = [
   {
     id: "heart", label: "Heart", glyph: "◉",
     question: "Am I honest with myself?",
-    color: "#b84a4a", colorLight: "#faeaea",
+    color: "#ef4444", colorLight: "#fef2f2",
     identity: "I feel things clearly, name them accurately, and don't let unexamined emotion drive consequential decisions.",
     pillars: null,
     goals: [
@@ -579,7 +590,7 @@ function Heptagon({ domains, onSelect, onCalendar }) {
             onMouseEnter={() => setHovered(d.id)} onMouseLeave={() => setHovered(null)}
             style={{ cursor: "pointer" }}>
             <text x={la.x} y={la.y - 3} textAnchor={anchor}
-              fontSize="11.5" fontFamily="Georgia, serif" fontStyle="italic"
+              fontSize="11.5" fontFamily="-apple-system,BlinkMacSystemFont,'Inter',sans-serif"
               fontWeight={isHov ? "700" : "400"}
               fill={isHov ? d.color : C.inkMid}
               style={{ pointerEvents: "none", transition: "fill 0.15s" }}>
@@ -604,11 +615,11 @@ function Heptagon({ domains, onSelect, onCalendar }) {
         onClick={onCalendar} />
       <text x={cx} y={cy - 5} textAnchor="middle" dominantBaseline="middle"
         fontSize="10" fill={centerHov ? C.navy : "rgba(255,255,255,0.5)"}
-        fontFamily="Georgia, serif" fontStyle="italic" letterSpacing="2.5"
+        fontFamily="-apple-system,BlinkMacSystemFont,'Inter',sans-serif" letterSpacing="2.5"
         style={{ pointerEvents: "none", transition: "fill 0.18s" }}>be</text>
       <text x={cx} y={cy + 9} textAnchor="middle" dominantBaseline="middle"
         fontSize="10" fill={centerHov ? C.navy : "rgba(255,255,255,0.5)"}
-        fontFamily="Georgia, serif" fontStyle="italic" letterSpacing="2.5"
+        fontFamily="-apple-system,BlinkMacSystemFont,'Inter',sans-serif" letterSpacing="2.5"
         style={{ pointerEvents: "none", transition: "fill 0.18s" }}>whole</text>
     </svg>
   );
@@ -619,11 +630,11 @@ function Heptagon({ domains, onSelect, onCalendar }) {
 // Ruled section heading — matches front page editorial feel
 function SectionRule({ label, color }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px" }}>
-      <div style={{ flex: 1, height: 1, background: `linear-gradient(to right, transparent, ${C.borderMid})` }} />
-      <span style={{ fontSize: 10, color: color || C.inkLight, fontFamily: "Georgia, serif",
-        fontStyle: "italic", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{label}</span>
-      <div style={{ flex: 1, height: 1, background: `linear-gradient(to left, transparent, ${C.borderMid})` }} />
+    <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "20px 0 12px" }}>
+      <div style={{ width: 3, height: 14, borderRadius: 2, background: color || C.caqi, flexShrink: 0 }} />
+      <span style={{ fontSize: 10, color: C.inkMid, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
+        fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{label}</span>
+      <div style={{ flex: 1, height: 1, background: C.border }} />
     </div>
   );
 }
@@ -634,8 +645,8 @@ function AddButton({ onClick, label }) {
       width: "100%", background: "transparent",
       border: `1px dashed ${C.borderMid}`, borderRadius: 6,
       padding: "10px", color: C.inkFaint, fontSize: 12,
-      cursor: "pointer", fontFamily: "Georgia, serif",
-      fontStyle: "italic", marginTop: 8,
+      cursor: "pointer", fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
+      fontWeight: 500, marginTop: 8,
     }}>+ {label}</button>
   );
 }
@@ -645,7 +656,7 @@ function GhostInput({ value, onChange, placeholder, onKeyDown }) {
     <input dir="ltr" value={value} onChange={onChange} onKeyDown={onKeyDown} placeholder={placeholder}
       style={{ flex: 1, background: "transparent", border: "none",
         borderBottom: `1px solid ${C.border}`, color: C.ink,
-        fontSize: 14, fontFamily: "Georgia, serif", padding: "4px 0",
+        fontSize: 14, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif", padding: "4px 0",
         outline: "none", fontStyle: "italic" }} />
   );
 }
@@ -666,11 +677,11 @@ function PillarBar({ pillars, goals, kpis, color }) {
             <div key={p.id}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ fontSize: 13, color: C.ink, fontFamily: "Georgia, serif", fontStyle: "italic" }}>{p.label}</span>
+                  <span style={{ fontSize: 13, color: C.ink, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif" }}>{p.label}</span>
                   <span style={{ fontSize: 11, color: C.inkFaint }}>{p.desc}</span>
                 </div>
                 {avgProgress !== null && (
-                  <span style={{ fontSize: 10, color: color, fontFamily: "'Courier New', monospace", fontWeight: 700 }}>{avgProgress}%</span>
+                  <span style={{ fontSize: 10, color: color, fontFamily: "'SF Mono','Fira Code',monospace", fontWeight: 700 }}>{avgProgress}%</span>
                 )}
               </div>
               {avgProgress !== null && (
@@ -681,7 +692,7 @@ function PillarBar({ pillars, goals, kpis, color }) {
               {pKPIs.length > 0 && (
                 <div style={{ display: "flex", gap: 12, marginTop: 5, flexWrap: "wrap" }}>
                   {pKPIs.map(k => (
-                    <span key={k.id} style={{ fontSize: 11, color: C.inkLight, fontFamily: "'Courier New', monospace" }}>
+                    <span key={k.id} style={{ fontSize: 11, color: C.inkLight, fontFamily: "'SF Mono','Fira Code',monospace" }}>
                       <span style={{ color: C.ink, fontWeight: 700 }}>{k.value}</span>{k.unit} {k.label.toLowerCase()}
                     </span>
                   ))}
@@ -725,8 +736,8 @@ function GoalsSection({ goals, color, colorLight, pillars, onUpdate }) {
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, flex: 1 }}>
-              <span style={{ fontSize: 10, color: color, fontFamily: "'Courier New', monospace", fontWeight: 700, flexShrink: 0 }}>{g.quarter}</span>
-              <span style={{ fontSize: 14, color: C.ink, fontFamily: "Georgia, serif", lineHeight: 1.3 }}>{g.text}</span>
+              <span style={{ fontSize: 10, color: color, fontFamily: "'SF Mono','Fira Code',monospace", fontWeight: 700, flexShrink: 0 }}>{g.quarter}</span>
+              <span style={{ fontSize: 14, color: C.ink, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif", lineHeight: 1.3 }}>{g.text}</span>
             </div>
             <span style={{ fontSize: 11, color: C.inkFaint, marginLeft: 10, flexShrink: 0 }}>{isOpen ? "▲" : "▼"}</span>
           </div>
@@ -741,7 +752,7 @@ function GoalsSection({ goals, color, colorLight, pillars, onUpdate }) {
             <div style={{ flex: 1, height: 3, background: C.border, borderRadius: 2 }}>
               <div style={{ height: "100%", width: `${g.progress}%`, background: color, borderRadius: 2 }} />
             </div>
-            <span style={{ fontSize: 10, color: color, fontFamily: "'Courier New', monospace", fontWeight: 700, width: 30, textAlign: "right" }}>{g.progress}%</span>
+            <span style={{ fontSize: 10, color: color, fontFamily: "'SF Mono','Fira Code',monospace", fontWeight: 700, width: 30, textAlign: "right" }}>{g.progress}%</span>
           </div>
         </div>
 
@@ -750,7 +761,7 @@ function GoalsSection({ goals, color, colorLight, pillars, onUpdate }) {
             {g.krs.length > 0 && (
               <div style={{ marginBottom: 14 }}>
                 {g.krs.map((kr, i) => (
-                  <div key={i} style={{ fontSize: 13, color: C.inkMid, fontFamily: "Georgia, serif",
+                  <div key={i} style={{ fontSize: 13, color: C.inkMid, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                     padding: "5px 0", borderBottom: `1px solid ${color}22`,
                     display: "flex", gap: 10, lineHeight: 1.5 }}>
                     <span style={{ color: color, flexShrink: 0, fontStyle: "italic" }}>—</span>
@@ -764,13 +775,13 @@ function GoalsSection({ goals, color, colorLight, pillars, onUpdate }) {
                 onChange={e => onUpdate(goals.map(x => x.id === g.id ? { ...x, progress: +e.target.value } : x))}
                 style={{ flex: 1, accentColor: color }} />
               <span style={{ fontSize: 13, fontWeight: 700, color: color, width: 36, textAlign: "right",
-                fontFamily: "'Courier New', monospace" }}>{g.progress}%</span>
+                fontFamily: "'SF Mono','Fira Code',monospace" }}>{g.progress}%</span>
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <select value={g.quarter}
                 onChange={e => onUpdate(goals.map(x => x.id === g.id ? { ...x, quarter: e.target.value } : x))}
                 style={{ background: "transparent", border: `1px solid ${color}44`, borderRadius: 4,
-                  color: color, fontSize: 11, fontFamily: "'Courier New', monospace", padding: "3px 8px" }}>
+                  color: color, fontSize: 11, fontFamily: "'SF Mono','Fira Code',monospace", padding: "3px 8px" }}>
                 {QUARTERS.map(q => <option key={q} value={q}>{q}</option>)}
               </select>
               <button onClick={() => onUpdate(goals.filter(x => x.id !== g.id))}
@@ -790,7 +801,7 @@ function GoalsSection({ goals, color, colorLight, pillars, onUpdate }) {
       {groups.map(({ pillar, goals: pg }) => (
         <div key={pillar?.id || "all"}>
           {pillar && (
-            <div style={{ fontSize: 11, color: color, fontFamily: "Georgia, serif", fontStyle: "italic",
+            <div style={{ fontSize: 11, color: color, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
               letterSpacing: "0.05em", marginTop: 16, marginBottom: 2 }}>{pillar.label}</div>
           )}
           {pg.map(renderGoal)}
@@ -806,13 +817,13 @@ function GoalsSection({ goals, color, colorLight, pillars, onUpdate }) {
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <select value={newGoal.quarter} onChange={e => setNewGoal({ ...newGoal, quarter: e.target.value })}
               style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, color: C.inkMid,
-                fontSize: 12, fontFamily: "'Courier New', monospace", padding: "5px 8px" }}>
+                fontSize: 12, fontFamily: "'SF Mono','Fira Code',monospace", padding: "5px 8px" }}>
               {QUARTERS.map(q => <option key={q} value={q}>{q}</option>)}
             </select>
             {pillars && (
               <select value={newGoal.pillar || ""} onChange={e => setNewGoal({ ...newGoal, pillar: e.target.value })}
                 style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, color: C.inkMid,
-                  fontSize: 12, fontFamily: "'Courier New', monospace", padding: "5px 8px" }}>
+                  fontSize: 12, fontFamily: "'SF Mono','Fira Code',monospace", padding: "5px 8px" }}>
                 {pillars.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
               </select>
             )}
@@ -843,7 +854,7 @@ function KPIsSection({ kpis, color, pillars, onUpdate }) {
   const renderKPI = (k) => (
     <div key={k.id} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between",
       padding: "10px 0", borderBottom: `1px solid ${C.border}` }}>
-      <span style={{ fontSize: 12, color: C.inkLight, fontFamily: "Georgia, serif", fontStyle: "italic", flex: 1 }}>{k.label}</span>
+      <span style={{ fontSize: 12, color: C.inkLight, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif", flex: 1 }}>{k.label}</span>
       <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
         {editing === k.id
           ? <input value={k.value} onChange={e => onUpdate(kpis.map(x => x.id === k.id ? { ...x, value: e.target.value } : x))}
@@ -858,7 +869,7 @@ function KPIsSection({ kpis, color, pillars, onUpdate }) {
         }
         {k.delta && (
           <span style={{ fontSize: 11, color: k.delta.startsWith("+") ? C.green : C.red,
-            fontFamily: "'Courier New', monospace", marginLeft: 4 }}>{k.delta}</span>
+            fontFamily: "'SF Mono','Fira Code',monospace", marginLeft: 4 }}>{k.delta}</span>
         )}
       </div>
     </div>
@@ -869,7 +880,7 @@ function KPIsSection({ kpis, color, pillars, onUpdate }) {
       {groups.map(({ pillar, kpis: pk }) => (
         <div key={pillar?.id || "all"}>
           {pillar && (
-            <div style={{ fontSize: 11, color: color, fontFamily: "Georgia, serif", fontStyle: "italic",
+            <div style={{ fontSize: 11, color: color, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
               marginTop: 16, marginBottom: 2 }}>{pillar.label}</div>
           )}
           {pk.map(renderKPI)}
@@ -882,14 +893,14 @@ function KPIsSection({ kpis, color, pillars, onUpdate }) {
             {[["label","Label"],["value","Value"],["unit","Unit"],["delta","Change (+4)"]].map(([k, ph]) => (
               <input key={k} value={newKPI[k]} onChange={e => setNewKPI({ ...newKPI, [k]: e.target.value })}
                 placeholder={ph} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4,
-                  color: C.ink, fontSize: 13, fontFamily: "Georgia, serif", padding: "6px 10px", outline: "none",
+                  color: C.ink, fontSize: 13, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif", padding: "6px 10px", outline: "none",
                   fontStyle: "italic" }} />
             ))}
           </div>
           {pillars && (
             <select value={newKPI.pillar || ""} onChange={e => setNewKPI({ ...newKPI, pillar: e.target.value })}
               style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, color: C.inkMid,
-                fontSize: 12, fontFamily: "'Courier New', monospace", padding: "5px 8px", marginBottom: 10 }}>
+                fontSize: 12, fontFamily: "'SF Mono','Fira Code',monospace", padding: "5px 8px", marginBottom: 10 }}>
               {pillars.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
           )}
@@ -930,7 +941,7 @@ function ActivitiesSection({ activities, color, colorLight, pillars, onUpdate })
   const renderActivity = (a) => (
     <div key={a.id} style={{ marginBottom: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <span style={{ fontSize: 13, color: C.inkMid, fontFamily: "Georgia, serif", fontStyle: "italic" }}>{a.text}</span>
+        <span style={{ fontSize: 13, color: C.inkMid, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif" }}>{a.text}</span>
         <button onClick={() => onUpdate(activities.filter(x => x.id !== a.id))}
           style={{ background: "transparent", border: "none", color: C.inkFaint, cursor: "pointer", fontSize: 13 }}>×</button>
       </div>
@@ -942,7 +953,7 @@ function ActivitiesSection({ activities, color, colorLight, pillars, onUpdate })
               textAlign: "center", cursor: "pointer",
             }}>
               <div style={{ fontSize: 8, color: on ? color : C.inkFaint,
-                fontFamily: "'Courier New', monospace", marginBottom: 3, letterSpacing: "0.04em" }}>{d}</div>
+                fontFamily: "'SF Mono','Fira Code',monospace", marginBottom: 3, letterSpacing: "0.04em" }}>{d}</div>
               <div style={{
                 height: 24, borderRadius: 3,
                 background: on ? color : C.bg,
@@ -962,7 +973,7 @@ function ActivitiesSection({ activities, color, colorLight, pillars, onUpdate })
       {groups.map(({ pillar, acts }) => (
         <div key={pillar?.id || "all"}>
           {pillar && (
-            <div style={{ fontSize: 11, color: color, fontFamily: "Georgia, serif", fontStyle: "italic",
+            <div style={{ fontSize: 11, color: color, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
               marginTop: 16, marginBottom: 8 }}>{pillar.label}</div>
           )}
           {acts.map(renderActivity)}
@@ -982,7 +993,7 @@ function ActivitiesSection({ activities, color, colorLight, pillars, onUpdate })
                 <div key={d} onClick={() => setNewAct(n => ({ ...n, days: n.days.includes(d) ? n.days.filter(x => x !== d) : [...n.days, d] }))}
                   style={{ textAlign: "center", cursor: "pointer" }}>
                   <div style={{ fontSize: 8, color: on ? color : C.inkFaint,
-                    fontFamily: "'Courier New', monospace", marginBottom: 3 }}>{d}</div>
+                    fontFamily: "'SF Mono','Fira Code',monospace", marginBottom: 3 }}>{d}</div>
                   <div style={{ height: 24, borderRadius: 3, background: on ? color : C.bg,
                     border: `1px solid ${on ? color : C.border}`, opacity: on ? 0.85 : 1 }} />
                 </div>
@@ -992,7 +1003,7 @@ function ActivitiesSection({ activities, color, colorLight, pillars, onUpdate })
           {pillars && (
             <select value={newAct.pillar || ""} onChange={e => setNewAct({ ...newAct, pillar: e.target.value })}
               style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, color: C.inkMid,
-                fontSize: 12, fontFamily: "'Courier New', monospace", padding: "5px 8px", marginBottom: 10 }}>
+                fontSize: 12, fontFamily: "'SF Mono','Fira Code',monospace", padding: "5px 8px", marginBottom: 10 }}>
               {pillars.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
           )}
@@ -1024,7 +1035,7 @@ function EditField({ label, value, field, placeholder, multiline, accentColor, o
   const commit = () => { onCommit(field, val); setEditing(false); };
   return (
     <div style={{ padding:"8px 0", borderBottom:`1px solid ${C.border}` }}>
-      {label && <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+      {label && <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
         textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:3 }}>{label}</div>}
       {editing ? (
         <div>
@@ -1032,13 +1043,13 @@ function EditField({ label, value, field, placeholder, multiline, accentColor, o
             ? <textarea dir="ltr" value={val} onChange={e => setVal(e.target.value)} rows={3}
                 autoFocus style={{ width:"100%", background:"transparent", border:"none",
                   borderBottom:`1px solid ${color}`, color:C.ink, fontSize:13,
-                  fontFamily:"Georgia, serif", fontStyle:"italic", padding:"2px 0",
+                  fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic", padding:"2px 0",
                   outline:"none", resize:"none", boxSizing:"border-box", direction:"ltr" }} />
             : <input dir="ltr" value={val} onChange={e => setVal(e.target.value)} autoFocus
                 onKeyDown={e => e.key==="Enter" && commit()}
                 style={{ width:"100%", background:"transparent", border:"none",
                   borderBottom:`1px solid ${color}`, color:C.ink, fontSize:13,
-                  fontFamily:"Georgia, serif", fontStyle:"italic", padding:"2px 0",
+                  fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic", padding:"2px 0",
                   outline:"none", boxSizing:"border-box", direction:"ltr" }} />
           }
           <div style={{ display:"flex", gap:8, marginTop:6 }}>
@@ -1054,7 +1065,7 @@ function EditField({ label, value, field, placeholder, multiline, accentColor, o
       ) : (
         <div onClick={() => { setVal(value||""); setEditing(true); }}
           style={{ fontSize:13, color:value ? C.inkMid : C.inkFaint,
-            fontFamily:"Georgia, serif", fontStyle:"italic",
+            fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
             cursor:"text", minHeight:18, lineHeight:1.5 }}>
           {value || <span style={{ opacity:0.4 }}>{placeholder}</span>}
         </div>
@@ -1073,10 +1084,10 @@ function TodoEditRow({ t, domainColor, todos, setTodos, setEditingTodo }) {
         onChange={e => setTodos(todos.map(x => x.id===t.id ? { ...x, text:e.target.value } : x))}
         style={{ width:"100%", background:"transparent", border:"none",
           borderBottom:`1px solid ${domainColor}`, color:C.ink, fontSize:14,
-          fontFamily:"Georgia, serif", fontStyle:"italic",
+          fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
           padding:"3px 0", outline:"none", boxSizing:"border-box", marginBottom:10,
           direction:"ltr" }} />
-      <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+      <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
         textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Time</div>
       <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:10 }}>
         {DURATIONS.map(d => (
@@ -1085,10 +1096,10 @@ function TodoEditRow({ t, domainColor, todos, setTodos, setEditingTodo }) {
               color:t.duration===d ? "#fff" : DUR_COLOR[d],
               border:`1.5px solid ${DUR_COLOR[d]}`,
               borderRadius:10, padding:"2px 9px", fontSize:10, cursor:"pointer",
-              fontFamily:"'Courier New', monospace" }}>{d}</button>
+              fontFamily:"'SF Mono','Fira Code',monospace" }}>{d}</button>
         ))}
       </div>
-      <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+      <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
         textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>When</div>
       <div style={{ display:"flex", gap:4, marginBottom:10 }}>
         {HORIZONS.map(h => (
@@ -1097,11 +1108,11 @@ function TodoEditRow({ t, domainColor, todos, setTodos, setEditingTodo }) {
               color:t.horizon===h ? "#fff" : C.inkLight,
               border:`1.5px solid ${t.horizon===h ? domainColor : C.border}`,
               borderRadius:4, padding:"3px 4px", fontSize:11, cursor:"pointer",
-              fontFamily:"Georgia, serif", fontStyle:"italic",
+              fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
               textTransform:"capitalize" }}>{h}</button>
         ))}
       </div>
-      <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+      <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
         textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Project</div>
       <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:12 }}>
         {PROJECTS.map(p => (
@@ -1110,7 +1121,7 @@ function TodoEditRow({ t, domainColor, todos, setTodos, setEditingTodo }) {
               color:t.project===p ? "#fff" : C.inkLight,
               border:`1px solid ${t.project===p ? domainColor : C.border}`,
               borderRadius:4, padding:"2px 9px", fontSize:10, cursor:"pointer",
-              fontFamily:"'Courier New', monospace" }}>{p}</button>
+              fontFamily:"'SF Mono','Fira Code',monospace" }}>{p}</button>
         ))}
       </div>
       <button onClick={() => setEditingTodo(null)}
@@ -1172,32 +1183,32 @@ function MilestoneEditRow({ m, accentColor, onSave, onCancel }) {
       <input ref={textRef} dir="ltr" defaultValue={m.text} autoFocus
         style={{ width:"100%", background:"transparent", border:"none",
           borderBottom:`1px solid ${accentColor}`, color:C.ink, fontSize:13,
-          fontFamily:"Georgia, serif", fontStyle:"italic",
+          fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
           padding:"3px 0", outline:"none", boxSizing:"border-box", marginBottom:8 }} />
       <div style={{ display:"flex", gap:8, marginBottom:8 }}>
         <div style={{ flex:1 }}>
-          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
             textTransform:"uppercase", marginBottom:3 }}>Start</div>
           <input type="date" value={startRaw} onChange={e => setStartRaw(e.target.value)}
             style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`,
               borderRadius:4, color:C.inkMid, fontSize:11,
-              fontFamily:"'Courier New', monospace", padding:"3px 6px", outline:"none" }} />
+              fontFamily:"'SF Mono','Fira Code',monospace", padding:"3px 6px", outline:"none" }} />
         </div>
         <div style={{ flex:1 }}>
-          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
             textTransform:"uppercase", marginBottom:3 }}>Due</div>
           <input type="date" value={dueRaw} onChange={e => setDueRaw(e.target.value)}
             style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`,
               borderRadius:4, color:C.inkMid, fontSize:11,
-              fontFamily:"'Courier New', monospace", padding:"3px 6px", outline:"none" }} />
+              fontFamily:"'SF Mono','Fira Code',monospace", padding:"3px 6px", outline:"none" }} />
         </div>
         <div style={{ flex:1 }}>
-          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
             textTransform:"uppercase", marginBottom:3 }}>Owner</div>
           <input ref={ownerRef} dir="ltr" defaultValue={m.owner || ""}
             style={{ width:"100%", background:"transparent", border:"none",
               borderBottom:`1px solid ${C.border}`, color:C.inkMid, fontSize:11,
-              fontFamily:"'Courier New', monospace", padding:"3px 0", outline:"none" }} />
+              fontFamily:"'SF Mono','Fira Code',monospace", padding:"3px 0", outline:"none" }} />
         </div>
       </div>
       <div style={{ display:"flex", gap:8 }}>
@@ -1223,7 +1234,7 @@ function GranolaPanel({ meetings, loading, importing, onSelect, onClose }) {
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
           <span style={{ fontSize:14 }}>🌿</span>
-          <span style={{ fontSize:12, color:"#16a34a", fontFamily:"'Courier New', monospace",
+          <span style={{ fontSize:12, color:"#16a34a", fontFamily:"'SF Mono','Fira Code',monospace",
             textTransform:"uppercase", letterSpacing:"0.08em" }}>Granola meetings</span>
         </div>
         <button onClick={onClose}
@@ -1244,10 +1255,10 @@ function GranolaPanel({ meetings, loading, importing, onSelect, onClose }) {
         <div key={m.id} style={{ display:"flex", alignItems:"center", gap:10,
           padding:"9px 0", borderBottom:`1px solid ${C.border}` }}>
           <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:13, color:C.ink, fontFamily:"Georgia, serif",
+            <div style={{ fontSize:13, color:C.ink, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
               fontWeight:500, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.title}</div>
             {m.date && <div style={{ fontSize:10, color:C.inkFaint,
-              fontFamily:"'Courier New', monospace", marginTop:2 }}>{m.date}</div>}
+              fontFamily:"'SF Mono','Fira Code',monospace", marginTop:2 }}>{m.date}</div>}
             {m.attendees && <div style={{ fontSize:10, color:C.inkFaint,
               fontStyle:"italic", marginTop:1 }}>{m.attendees}</div>}
           </div>
@@ -1276,7 +1287,7 @@ function FollowUpInput({ onAdd, accentColor }) {
         placeholder="Add follow-up…"
         style={{ flex:1, background:"transparent", border:"none",
           borderBottom:`1px solid ${color}55`, color:C.ink, fontSize:13,
-          fontFamily:"Georgia, serif", fontStyle:"italic",
+          fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
           padding:"3px 0", outline:"none", direction:"ltr" }} />
       <button onClick={submit}
         style={{ background:"transparent", border:`1px solid ${color}`,
@@ -1305,7 +1316,7 @@ function AddContactForm({ onAdd, onCancel, accentColor, crmStages, stageColors }
           placeholder={ph}
           style={{ width:"100%", background:"transparent", border:"none",
             borderBottom:`1px solid ${C.border}`, color:C.ink, fontSize:14,
-            fontFamily:"Georgia, serif", fontStyle:"italic",
+            fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
             padding:"6px 0", outline:"none", boxSizing:"border-box", marginBottom:8 }} />
       ))}
       <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:10 }}>
@@ -1314,8 +1325,8 @@ function AddContactForm({ onAdd, onCancel, accentColor, crmStages, stageColors }
             style={{ background:stage===s ? (stageColors[s]||accentColor) : "transparent",
               color:stage===s ? "#fff" : (stageColors[s]||accentColor),
               border:`1.5px solid ${stageColors[s]||accentColor}`,
-              borderRadius:20, padding:"2px 9px", fontSize:10, cursor:"pointer",
-              fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{s}</button>
+              borderRadius:6, padding:"3px 10px", fontSize:10, fontWeight:500, cursor:"pointer",
+              fontFamily:"'SF Mono','Fira Code',monospace", textTransform:"capitalize" }}>{s}</button>
         ))}
       </div>
       <div style={{ display:"flex", gap:8 }}>
@@ -1350,24 +1361,24 @@ function AddMilestoneForm({ onAdd, onCancel, accentColor }) {
     <div style={{ padding:"10px 0", borderTop:`1px solid ${C.border}`, display:"flex", flexDirection:"column", gap:8 }}>
       <input ref={textRef} dir="ltr" defaultValue="" autoFocus placeholder="Milestone…"
         style={{ background:"transparent", border:"none", borderBottom:`1px solid ${accentColor}`,
-          color:C.ink, fontSize:13, fontFamily:"Georgia, serif", fontStyle:"italic",
+          color:C.ink, fontSize:13, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
           padding:"3px 0", outline:"none", width:"100%", boxSizing:"border-box" }} />
       <div style={{ display:"flex", gap:8 }}>
         <div style={{ flex:1 }}>
-          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
             textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Due date</div>
           <input type="date" value={dueRaw} onChange={e => setDueRaw(e.target.value)}
             style={{ width:"100%", background:C.bg, border:`1px solid ${C.border}`,
               borderRadius:4, color:C.inkMid, fontSize:12,
-              fontFamily:"'Courier New', monospace", padding:"4px 6px", outline:"none" }} />
+              fontFamily:"'SF Mono','Fira Code',monospace", padding:"4px 6px", outline:"none" }} />
         </div>
         <div style={{ flex:1 }}>
-          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+          <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
             textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:3 }}>Owner</div>
           <input ref={ownerRef} dir="ltr" defaultValue="" placeholder="Name"
             style={{ width:"100%", background:"transparent", border:"none",
               borderBottom:`1px solid ${C.border}`, color:C.inkMid, fontSize:12,
-              fontFamily:"'Courier New', monospace", padding:"3px 0", outline:"none" }} />
+              fontFamily:"'SF Mono','Fira Code',monospace", padding:"3px 0", outline:"none" }} />
         </div>
       </div>
       <div style={{ display:"flex", gap:8 }}>
@@ -1394,7 +1405,7 @@ function AddProjectForm({ onAdd, onCancel, accentColor, statusColors }) {
       <input ref={nameRef} dir="ltr" defaultValue="" autoFocus placeholder="Project name…"
         style={{ width:"100%", background:"transparent", border:"none",
           borderBottom:`1px solid ${accentColor}`, color:C.ink, fontSize:14,
-          fontFamily:"Georgia, serif", fontStyle:"italic",
+          fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
           padding:"4px 0", outline:"none", boxSizing:"border-box", marginBottom:10 }} />
       <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginBottom:10 }}>
         {Object.keys(statusColors).map(s => (
@@ -1402,8 +1413,8 @@ function AddProjectForm({ onAdd, onCancel, accentColor, statusColors }) {
             style={{ background:status===s ? statusColors[s] : "transparent",
               color:status===s ? "#fff" : statusColors[s],
               border:`1.5px solid ${statusColors[s]}`,
-              borderRadius:20, padding:"2px 9px", fontSize:10, cursor:"pointer",
-              fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{s}</button>
+              borderRadius:6, padding:"3px 10px", fontSize:10, fontWeight:500, cursor:"pointer",
+              fontFamily:"'SF Mono','Fira Code',monospace", textTransform:"capitalize" }}>{s}</button>
         ))}
       </div>
       <div style={{ display:"flex", gap:8 }}>
@@ -1429,7 +1440,7 @@ function AddStatusForm({ onAdd, onCancel, projectName }) {
         placeholder={`What happened this week on ${projectName}?`}
         style={{ width:"100%", background:"transparent", border:"none",
           borderBottom:`1px solid ${C.caqi}`, color:C.ink, fontSize:13,
-          fontFamily:"Georgia, serif", fontStyle:"italic", lineHeight:1.6,
+          fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", lineHeight:1.6,
           padding:"4px 0", outline:"none", resize:"none", boxSizing:"border-box",
           direction:"ltr", marginBottom:8 }} />
       <div style={{ display:"flex", gap:8 }}>
@@ -1453,7 +1464,7 @@ const PRIORITIES = ["high", "med", "low"];
 const CRM_STAGES_DEFAULT = ["prospect", "investor", "portfolio", "advisor", "team"];
 const PROJECTS   = ["Maro","Immersiv","Bloomwell","OSI","Wellnest","Calibright","Portoro","DCG"];
 const PRI_COLOR  = { high: C.red, med: C.gold, low: C.inkFaint };
-const STAGE_COLOR = { prospect: "#b87a2a", investor: "#3d6ea8", portfolio: "#4e9e8e", advisor: "#7a5aaa", team: "#3a8a5a" };
+const STAGE_COLOR = { prospect: "#b87a2a", investor: "#3b82f6", portfolio: "#0d9488", advisor: "#8b5cf6", team: "#3a8a5a" };
 const HEALTH_COLOR = (h) => h >= 4 ? C.green : h === 3 ? C.gold : C.red;
 
 // Warmth: based on days since last contact
@@ -1532,27 +1543,17 @@ function WorkDomainView({ domain, onUpdate }) {
   // ── Domain header ────────────────────────────────────────────────────────
   const Header = () => (
     <div style={{ paddingTop: 8, paddingBottom: 16, textAlign: "center" }}>
-      <div style={{ fontSize: 11, color: C.inkFaint, fontFamily: "'Courier New', monospace",
+      <div style={{ fontSize: 11, color: C.inkFaint, fontFamily: "'SF Mono','Fira Code',monospace",
         letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 12 }}>
         {domain.question}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 8 }}>
-        <div style={{ flex: 1, height: 1, background: `linear-gradient(to right, transparent, ${domain.color}66)` }} />
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 22, color: domain.color }}>{domain.glyph}</span>
-          <span style={{ fontSize: 28, color: C.navy, fontWeight: 700, letterSpacing: "-0.3px" }}>Work</span>
-        </div>
-        <div style={{ flex: 1, height: 1, background: `linear-gradient(to left, transparent, ${domain.color}66)` }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <div style={{ width: 4, height: 28, borderRadius: 2, background: domain.color, flexShrink: 0 }} />
+        <span style={{ fontSize: 22, color: domain.color }}>{domain.glyph}</span>
+        <span style={{ fontSize: 24, color: C.navy, fontWeight: 700, letterSpacing: "-0.5px" }}>Work</span>
       </div>
-      <div style={{ fontSize: 13, color: C.inkLight, fontStyle: "italic", lineHeight: 1.6,
-        maxWidth: 380, margin: "0 auto 12px" }}>{domain.identity}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-        <div style={{ flex: 1, height: 1, background: `linear-gradient(to right, transparent, ${C.borderMid})` }} />
-        <div style={{ width: 4, height: 4, borderRadius: "50%", background: domain.color, opacity: 0.5 }} />
-        <div style={{ width: 16, height: 1, background: C.borderMid, opacity: 0.5 }} />
-        <div style={{ width: 4, height: 4, borderRadius: "50%", background: domain.color, opacity: 0.5 }} />
-        <div style={{ flex: 1, height: 1, background: `linear-gradient(to left, transparent, ${C.borderMid})` }} />
-      </div>
+      <div style={{ fontSize: 13, color: C.inkLight, lineHeight: 1.6, marginBottom: 12 }}>{domain.identity}</div>
+      <div style={{ height: 1, background: C.border, marginBottom: 12 }} />
       <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
         {(() => {
           // ── WORK HEALTH SCORE ALGORITHM ───────────────────────────────────
@@ -1649,7 +1650,7 @@ function WorkDomainView({ domain, onUpdate }) {
                   }} />
                 ))}
               </div>
-              <div style={{ fontSize:9, color:trendColor, fontFamily:"'Courier New', monospace",
+              <div style={{ fontSize:9, color:trendColor, fontFamily:"'SF Mono','Fira Code',monospace",
                 opacity:0.7, letterSpacing:"0.05em" }}>
                 {composite}pts · {delta > 3 ? "▲" : delta < -3 ? "▼" : "—"} {todoScore}T / {projectScore}P / {peopleScore}E
               </div>
@@ -1690,7 +1691,7 @@ function WorkDomainView({ domain, onUpdate }) {
                 borderBottom:`2px solid ${todoHorizon===h ? domain.color : "transparent"}`,
                 color:todoHorizon===h ? domain.color : C.inkFaint,
                 padding:"8px 4px", fontSize:12, cursor:"pointer",
-                fontFamily:"Georgia, serif", fontStyle:"italic",
+                fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
                 textTransform:"capitalize", marginBottom:-1 }}>
                 {h}{count>0 && <span style={{fontSize:10,opacity:0.65,marginLeft:4}}>({count})</span>}
               </button>
@@ -1725,7 +1726,7 @@ function WorkDomainView({ domain, onUpdate }) {
                 {/* Text + meta — tap text to open edit */}
                 <div style={{flex:1,minWidth:0}}>
                   <div onClick={() => setEditingTodo(t.id)}
-                    style={{fontSize:14,color:C.ink,fontFamily:"Georgia, serif",
+                    style={{fontSize:14,color:C.ink,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                       lineHeight:1.4,cursor:"text"}}>{t.text}</div>
                   <div style={{display:"flex",gap:6,marginTop:5,alignItems:"center",flexWrap:"wrap"}}>
                     <span onClick={() => {
@@ -1734,10 +1735,10 @@ function WorkDomainView({ domain, onUpdate }) {
                     }} style={{fontSize:10,color:DUR_COLOR[t.duration]||C.inkFaint,
                       background:(DUR_COLOR[t.duration]||C.inkFaint)+"18",
                       border:`1px solid ${DUR_COLOR[t.duration]||C.inkFaint}33`,
-                      borderRadius:10,padding:"1px 7px",fontFamily:"'Courier New', monospace",
+                      borderRadius:10,padding:"1px 7px",fontFamily:"'SF Mono','Fira Code',monospace",
                       cursor:"pointer",userSelect:"none"}}>{t.duration}</span>
                     {t.project && (
-                      <span style={{fontSize:10,color:domain.color,fontFamily:"'Courier New', monospace"}}>{t.project}</span>
+                      <span style={{fontSize:10,color:domain.color,fontFamily:"'SF Mono','Fira Code',monospace"}}>{t.project}</span>
                     )}
                     {t.contactId && (
                       <span style={{fontSize:10,color:C.inkFaint,fontStyle:"italic"}}>→ {contactName(t.contactId)}</span>
@@ -1752,7 +1753,7 @@ function WorkDomainView({ domain, onUpdate }) {
                       style={{background:"transparent",border:`1px solid ${C.borderMid}`,
                         borderRadius:3,color:to==="today"?C.caqi:C.inkFaint,
                         fontSize:9,padding:"2px 6px",cursor:"pointer",
-                        fontFamily:"'Courier New', monospace",whiteSpace:"nowrap",lineHeight:1.4}}>{label}</button>
+                        fontFamily:"'SF Mono','Fira Code',monospace",whiteSpace:"nowrap",lineHeight:1.4}}>{label}</button>
                   ))}
                 </div>
 
@@ -1788,17 +1789,17 @@ function WorkDomainView({ domain, onUpdate }) {
                 }}
                 style={{width:"100%",background:"transparent",border:"none",
                   borderBottom:`1px solid ${domain.color}`,color:C.ink,fontSize:14,
-                  fontFamily:"Georgia, serif",fontStyle:"italic",
+                  fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontStyle:"italic",
                   padding:"4px 0",outline:"none",boxSizing:"border-box"}} />
               {suggestion && (
                 <div style={{ fontSize:10, color:C.inkFaint,
-                  fontFamily:"'Courier New', monospace", marginTop:4 }}>
+                  fontFamily:"'SF Mono','Fira Code',monospace", marginTop:4 }}>
                   Tab → <span style={{ color:C.caqi }}>{suggestion}</span>
                 </div>
               )}
             </div>
 
-            <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New', monospace",
+            <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
               textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Time needed</div>
             <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:12}}>
               {DURATIONS.map(d => (
@@ -1807,11 +1808,11 @@ function WorkDomainView({ domain, onUpdate }) {
                     color:newTodo.duration===d?"#fff":DUR_COLOR[d],
                     border:`1.5px solid ${DUR_COLOR[d]}`,
                     borderRadius:10,padding:"3px 10px",fontSize:11,cursor:"pointer",
-                    fontFamily:"'Courier New', monospace"}}>{d}</button>
+                    fontFamily:"'SF Mono','Fira Code',monospace"}}>{d}</button>
               ))}
             </div>
 
-            <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New', monospace",
+            <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
               textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>When</div>
             <div style={{display:"flex",gap:4,marginBottom:12}}>
               {HORIZONS.map(h => (
@@ -1820,12 +1821,12 @@ function WorkDomainView({ domain, onUpdate }) {
                     color:newTodo.horizon===h?"#fff":C.inkLight,
                     border:`1.5px solid ${newTodo.horizon===h?domain.color:C.border}`,
                     borderRadius:4,padding:"4px 4px",fontSize:11,cursor:"pointer",
-                    fontFamily:"Georgia, serif",fontStyle:"italic",
+                    fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontStyle:"italic",
                     textTransform:"capitalize"}}>{h}</button>
               ))}
             </div>
 
-            <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New', monospace",
+            <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
               textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:4}}>Project</div>
             <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:14}}>
               {PROJECTS.map(p => (
@@ -1834,7 +1835,7 @@ function WorkDomainView({ domain, onUpdate }) {
                     color:newTodo.project===p?"#fff":C.inkLight,
                     border:`1px solid ${newTodo.project===p?domain.color:C.border}`,
                     borderRadius:4,padding:"2px 9px",fontSize:10,cursor:"pointer",
-                    fontFamily:"'Courier New', monospace"}}>{p}</button>
+                    fontFamily:"'SF Mono','Fira Code',monospace"}}>{p}</button>
               ))}
             </div>
 
@@ -1856,7 +1857,7 @@ function WorkDomainView({ domain, onUpdate }) {
           <button onClick={() => { setAddingTodo(true); setNewTodo(n => ({...n,horizon:todoHorizon})); }}
             style={{width:"100%",background:"transparent",border:`1px dashed ${C.borderMid}`,
               borderRadius:6,padding:"9px",color:C.inkFaint,fontSize:12,cursor:"pointer",
-              fontFamily:"Georgia, serif",fontStyle:"italic",marginTop:10}}>+ Add task</button>
+              fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontStyle:"italic",marginTop:10}}>+ Add task</button>
         )}
 
         {/* Done */}
@@ -1876,9 +1877,9 @@ function WorkDomainView({ domain, onUpdate }) {
                   </div>
                   <span onClick={() => setEditingTodo(t.id)}
                     style={{fontSize:13,color:C.inkMid,textDecoration:"line-through",
-                      fontFamily:"Georgia, serif",flex:1,cursor:"text"}}>{t.text}</span>
+                      fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",flex:1,cursor:"text"}}>{t.text}</span>
                   {t.doneAt && (
-                    <span style={{fontSize:9,color:C.inkFaint,fontFamily:"'Courier New', monospace",
+                    <span style={{fontSize:9,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
                       flexShrink:0,whiteSpace:"nowrap"}}>{t.doneAt}</span>
                   )}
                   <button onClick={() => setTodos(todos.filter(x => x.id!==t.id))}
@@ -2039,7 +2040,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
             setCrmSearchTick(t => t+1);
           }}
             style={{ background:"transparent", border:"none", color:domain.color,
-              cursor:"pointer", fontSize:12, fontFamily:"Georgia, serif", fontStyle:"italic",
+              cursor:"pointer", fontSize:12, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
               padding:"0 0 14px", display:"block" }}>← people</button>
 
           {/* Header */}
@@ -2050,11 +2051,11 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
               border:`1.5px solid ${STAGE_COLOR[contact.stage]}55`,
               display:"flex", alignItems:"center", justifyContent:"center" }}>
               <span style={{ fontSize:17, color:STAGE_COLOR[contact.stage],
-                fontFamily:"Georgia, serif", fontWeight:600 }}>{contact.name[0]}</span>
+                fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontWeight:600 }}>{contact.name[0]}</span>
             </div>
             <div style={{ flex:1 }}>
               <EditField label="" field="name" value={contact.name} placeholder="Name" accentColor={domain.color} onCommit={updateContact} />
-              <div style={{ fontSize:12, color:C.inkLight, fontStyle:"italic", marginBottom:8 }}>
+              <div style={{ fontSize:12, color:C.inkLight, marginBottom:8 }}>
                 <EditField label="" field="role" value={contact.role} placeholder="Role" accentColor={domain.color} onCommit={updateContact} />
                 <EditField label="" field="company" value={contact.company} placeholder="Company" accentColor={domain.color} onCommit={updateContact} />
               </div>
@@ -2066,7 +2067,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                       background: v<=warmth ? WARMTH_COLOR(warmth) : C.border }} />
                   ))}
                 </div>
-                <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+                <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace" }}>
                   {contact.lastContact ? `last spoke ${contact.lastContact}` : "never contacted"}
                 </span>
               </div>
@@ -2076,15 +2077,15 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                 <button onClick={() => setWritingCall({ contactId:selectedContact, date:today })}
                   style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
                     fontSize:11, padding:"5px 12px", cursor:"pointer",
-                    fontFamily:"Georgia, serif", fontStyle:"italic", fontWeight:600 }}>+ note</button>
+                    fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic", fontWeight:600 }}>+ note</button>
                 <button onClick={startRecording}
                   style={{ background:"transparent", border:`1.5px solid ${C.red}`,
                     borderRadius:4, color:C.red, fontSize:11, padding:"5px 10px",
-                    cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic" }}>🎙 record</button>
+                    cursor:"pointer", fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic" }}>🎙 record</button>
                 <button onClick={() => granolaOpen==="contact" ? setGranolaOpen(null) : openGranola("contact")}
                   style={{ background:"transparent", border:`1.5px solid #16a34a`,
                     borderRadius:4, color:"#16a34a", fontSize:11, padding:"5px 10px",
-                    cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic" }}>🌿 Granola</button>
+                    cursor:"pointer", fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic" }}>🌿 Granola</button>
               </div>
             )}
           </div>
@@ -2096,8 +2097,8 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                 style={{ background:contact.stage===s ? STAGE_COLOR[s] : "transparent",
                   color:contact.stage===s ? "#fff" : STAGE_COLOR[s],
                   border:`1.5px solid ${STAGE_COLOR[s]}`,
-                  borderRadius:20, padding:"2px 9px", fontSize:10, cursor:"pointer",
-                  fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{s}</button>
+                  borderRadius:6, padding:"3px 10px", fontSize:10, fontWeight:500, cursor:"pointer",
+                  fontFamily:"'SF Mono','Fira Code',monospace", textTransform:"capitalize" }}>{s}</button>
             ))}
           </div>
 
@@ -2111,7 +2112,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
               display:"flex", alignItems:"center", gap:8 }}>
               <span style={{ fontSize:10, color:C.inkFaint, width:14, flexShrink:0 }}>{icon}</span>
               <a href={href(contact[field])} target="_blank" rel="noopener noreferrer"
-                style={{ fontSize:12, color:domain.color, fontFamily:"'Courier New', monospace",
+                style={{ fontSize:12, color:domain.color, fontFamily:"'SF Mono','Fira Code',monospace",
                   textDecoration:"none" }}>{contact[field]}</a>
             </div>
           ) : null)}
@@ -2135,10 +2136,10 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                   <div onClick={() => setTodos(todos.map(x => x.id===t.id?{...x,done:true,doneAt:new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"})}:x))}
                     style={{ width:15, height:15, borderRadius:3, flexShrink:0, marginTop:2,
                       border:`2px solid ${C.borderMid}`, background:"transparent", cursor:"pointer" }} />
-                  <span style={{ fontSize:13, color:C.inkMid, fontFamily:"Georgia, serif",
+                  <span style={{ fontSize:13, color:C.inkMid, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                     fontStyle:"italic", flex:1 }}>{t.text}</span>
                   <span style={{ fontSize:10, color:DUR_COLOR[t.duration]||C.inkFaint,
-                    fontFamily:"'Courier New', monospace" }}>{t.duration}</span>
+                    fontFamily:"'SF Mono','Fira Code',monospace" }}>{t.duration}</span>
                 </div>
               ))}
             </div>
@@ -2181,7 +2182,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                         justifyContent:"center" }}>
                       {f.done && <span style={{ fontSize:8, color:"#fff", fontWeight:700 }}>✓</span>}
                     </div>
-                    <span style={{ fontSize:13, color:C.inkMid, fontFamily:"Georgia, serif",
+                    <span style={{ fontSize:13, color:C.inkMid, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                       fontStyle:"italic", flex:1,
                       textDecoration: f.done ? "line-through" : "none" }}>{f.text}</span>
                     <button onClick={() => deleteFollowUp(f.id)}
@@ -2208,7 +2209,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                     <div style={{ width:8, height:8, borderRadius:"50%", background:C.red,
                       animation:"pulse 1s infinite" }} />
                   )}
-                  <span style={{ fontSize:11, color:C.red, fontFamily:"'Courier New', monospace",
+                  <span style={{ fontSize:11, color:C.red, fontFamily:"'SF Mono','Fira Code',monospace",
                     textTransform:"uppercase", letterSpacing:"0.08em" }}>
                     {recording ? "Recording…" : generatingNotes ? "Generating notes…" : "Review notes"}
                   </span>
@@ -2229,11 +2230,11 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
               {/* Live transcript */}
               {(recording || transcript) && !recordedNotes && (
                 <div style={{ padding:"10px 14px", maxHeight:120, overflowY:"auto" }}>
-                  <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+                  <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
                     textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:6 }}>
                     Live transcript
                   </div>
-                  <div style={{ fontSize:13, color:C.inkMid, fontFamily:"Georgia, serif",
+                  <div style={{ fontSize:13, color:C.inkMid, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                     fontStyle:"italic", lineHeight:1.7 }}>
                     {transcript || <span style={{ opacity:0.4 }}>Start speaking…</span>}
                   </div>
@@ -2250,7 +2251,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
               {/* Generated notes — editable before saving */}
               {recordedNotes && !generatingNotes && (
                 <div style={{ padding:"10px 14px" }}>
-                  <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+                  <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
                     textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:6 }}>
                     Generated notes · tap to edit
                   </div>
@@ -2259,7 +2260,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                     value={recordedNotes}
                     onChange={e => setRecordedNotes(e.target.value)}
                     style={{ width:"100%", background:"transparent", border:"none",
-                      color:C.ink, fontSize:13, fontFamily:"Georgia, serif",
+                      color:C.ink, fontSize:13, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                       fontStyle:"italic", lineHeight:1.7,
                       padding:0, outline:"none", resize:"none",
                       boxSizing:"border-box", direction:"ltr", textAlign:"left",
@@ -2327,17 +2328,17 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                     onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
                     style={{ background:"transparent", border:`1px solid ${C.border}`,
                       borderRadius:3, padding:"0 7px", height:24, cursor:"pointer",
-                      fontSize:11, color:C.inkMid, fontFamily:"'Courier New', monospace" }}>
+                      fontSize:11, color:C.inkMid, fontFamily:"'SF Mono','Fira Code',monospace" }}>
                     {icon}
                   </button>
                 ))}
               </div>
               <div style={{ padding:14 }}>
-                <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
+                <div style={{ fontSize:10, color:domain.color, fontFamily:"'SF Mono','Fira Code',monospace",
                   textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>{today}</div>
-                <div ref={noteRef} dir="ltr" contentEditable suppressContentEditableWarning
+                <div ref={noteRef} dir="ltr" contentEditable suppressContentEditableWarning suppressContentEditableWarning
                   style={{ width:"100%", minHeight:140, background:"transparent", border:"none",
-                    color:C.ink, fontSize:14, fontFamily:"Georgia, serif", lineHeight:1.8,
+                    color:C.ink, fontSize:14, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", lineHeight:1.8,
                     outline:"none", direction:"ltr", textAlign:"left",
                     whiteSpace:"pre-wrap", wordBreak:"break-word" }}
                   data-placeholder="Write freely…" onKeyDown={noteKeyHandler} />
@@ -2361,7 +2362,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
             <div style={{ background:domain.colorLight, border:`1px solid ${domain.color}33`,
               borderLeft:`3px solid ${domain.color}`, borderRadius:6,
               padding:"12px 14px", margin:"14px 0" }}>
-              <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
+              <div style={{ fontSize:10, color:domain.color, fontFamily:"'SF Mono','Fira Code',monospace",
                 textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Summarizing…</div>
               <div style={{ fontSize:12, color:C.inkFaint, fontStyle:"italic" }}>Claude is reading your notes…</div>
             </div>
@@ -2370,20 +2371,20 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
               borderLeft:`3px solid ${domain.color}`, borderRadius:6,
               padding:"12px 14px", margin:"14px 0" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-                <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
+                <div style={{ fontSize:10, color:domain.color, fontFamily:"'SF Mono','Fira Code',monospace",
                   textTransform:"uppercase", letterSpacing:"0.08em" }}>Summary</div>
                 <button onClick={() => generateSummary(selectedContact)}
                   style={{ background:"transparent", border:"none", color:C.inkFaint,
-                    cursor:"pointer", fontSize:10, fontFamily:"'Courier New', monospace", padding:0 }}>↻ refresh</button>
+                    cursor:"pointer", fontSize:10, fontFamily:"'SF Mono','Fira Code',monospace", padding:0 }}>↻ refresh</button>
               </div>
-              <div style={{ fontSize:14, color:C.inkMid, fontFamily:"Georgia, serif",
+              <div style={{ fontSize:14, color:C.inkMid, fontFamily:"Georgia,serif",
                 lineHeight:1.8, fontStyle:"italic" }}>{contact.aiSummary}</div>
             </div>
           ) : contactNotes.length > 0 ? (
             <button onClick={() => generateSummary(selectedContact)}
               style={{ width:"100%", background:"transparent", border:`1px dashed ${domain.color}66`,
                 borderRadius:6, padding:"10px", color:domain.color, fontSize:12,
-                cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic", margin:"14px 0 0" }}>
+                cursor:"pointer", fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic", margin:"14px 0 0" }}>
               Generate summary from notes
             </button>
           ) : null}
@@ -2424,7 +2425,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                   style={{ width:"100%", background:C.surface,
                     border:`1px solid ${C.border}`,
                     borderRadius:6, color:C.ink, fontSize:13,
-                    fontFamily:"Georgia, serif", fontStyle:"italic",
+                    fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
                     padding:"9px 14px", outline:"none", boxSizing:"border-box" }} />
                 {notesAnswer && (
                   <button onClick={() => { setNotesQuery(""); setNotesAnswer(""); if(notesQueryRef.current) notesQueryRef.current.value = ""; }}
@@ -2441,9 +2442,9 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                 <div style={{ background:domain.colorLight, border:`1px solid ${domain.color}33`,
                   borderLeft:`3px solid ${domain.color}`, borderRadius:6,
                   padding:"12px 14px", marginTop:8 }}>
-                  <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
+                  <div style={{ fontSize:10, color:domain.color, fontFamily:"'SF Mono','Fira Code',monospace",
                     textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:6 }}>Answer</div>
-                  <div style={{ fontSize:14, color:C.inkMid, fontFamily:"Georgia, serif",
+                  <div style={{ fontSize:14, color:C.inkMid, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                     lineHeight:1.7, fontStyle:"italic" }}>{notesAnswer}</div>
                 </div>
               )}
@@ -2467,7 +2468,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                         padding:"10px 0", cursor:"pointer" }}>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontSize:11, color:domain.color,
-                          fontFamily:"'Courier New', monospace", marginBottom:2 }}>{cl.date}</div>
+                          fontFamily:"'SF Mono','Fira Code',monospace", marginBottom:2 }}>{cl.date}</div>
                         {!isExpanded && (
                           <div style={{ fontSize:12, color:C.inkFaint, fontStyle:"italic",
                             overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{preview}</div>
@@ -2506,7 +2507,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                               suppressContentEditableWarning onKeyDown={noteKeyHandler}
                               dangerouslySetInnerHTML={{ __html: cl.notes }}
                               style={{ padding:10, minHeight:80, color:C.ink, fontSize:14,
-                                fontFamily:"Georgia, serif", lineHeight:1.8, outline:"none",
+                                fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", lineHeight:1.8, outline:"none",
                                 direction:"ltr", textAlign:"left" }} />
                             <div style={{ display:"flex", gap:6, padding:"6px 10px",
                               borderTop:`1px solid ${C.border}` }}>
@@ -2523,7 +2524,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                         ) : (
                           <>
                             <div dangerouslySetInnerHTML={{ __html: cl.notes }}
-                              style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif",
+                              style={{ fontSize:14, color:C.ink, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                                 lineHeight:1.8 }} />
                             <div style={{ display:"flex", gap:8, marginTop:8 }}>
                               <button onClick={e=>{e.stopPropagation();setEditingNoteId(cl.id);}}
@@ -2570,7 +2571,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
             style={{ width:"100%", background:C.surface,
               border:`1px solid ${C.border}`,
               borderRadius:6, color:C.ink, fontSize:14,
-              fontFamily:"Georgia, serif", fontStyle:"italic",
+              fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
               padding:"9px 14px", outline:"none", boxSizing:"border-box" }} />
         </div>
 
@@ -2589,22 +2590,22 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                 color: crmFilter===s ? "#fff" : (STAGE_COLOR[s]||C.inkLight),
                 border:`1.5px solid ${STAGE_COLOR[s]||domain.color}`,
                 borderRadius:20, padding:"3px 10px", fontSize:10, cursor:"pointer",
-                fontFamily:"'Courier New', monospace", textTransform:"capitalize",
+                fontFamily:"'SF Mono','Fira Code',monospace", textTransform:"capitalize",
                 transition:"all 0.12s" }}>{s}</button>
           ))}
           <button onClick={() => setEditingStages(e => !e)}
             style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
               borderRadius:20, padding:"3px 10px", fontSize:10, cursor:"pointer",
-              color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+              color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace" }}>
             {editingStages ? "done" : "✎ labels"}
           </button>
         </div>
 
         {/* Stage editor */}
         {editingStages && (
-          <div style={{ background:C.surface, border:`1px solid ${C.border}`,
+          <div style={{ background:C.surface, boxShadow:C.shadow,
             borderRadius:6, padding:12, marginBottom:12 }}>
-            <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+            <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
               textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:8 }}>Edit labels</div>
             <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:10 }}>
               {CRM_STAGES.map((s, i) => (
@@ -2612,7 +2613,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                   <div style={{ width:8, height:8, borderRadius:"50%", flexShrink:0,
                     background: STAGE_COLOR[s] || domain.color }} />
                   <span style={{ flex:1, fontSize:13, color:C.ink,
-                    fontFamily:"'Courier New', monospace" }}>{s}</span>
+                    fontFamily:"'SF Mono','Fira Code',monospace" }}>{s}</span>
                   <button onClick={() => {
                     const updated = CRM_STAGES.filter((_, j) => j !== i);
                     setCrmStages(updated);
@@ -2635,7 +2636,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                 placeholder="New label…"
                 style={{ flex:1, background:"transparent", border:"none",
                   borderBottom:`1px solid ${domain.color}`, color:C.ink,
-                  fontSize:13, fontFamily:"'Courier New', monospace",
+                  fontSize:13, fontFamily:"'SF Mono','Fira Code',monospace",
                   padding:"3px 0", outline:"none" }} />
               <button onClick={() => {
                 if (!newStageName.trim()) return;
@@ -2672,7 +2673,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                 {letters.map(letter => (
                   <div key={letter} id={`crm-letter-${letter}`}>
                     {/* Letter header */}
-                    <div style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
+                    <div style={{ fontSize:10, color:domain.color, fontFamily:"'SF Mono','Fira Code',monospace",
                       fontWeight:700, padding:"8px 0 4px", letterSpacing:"0.1em",
                       borderBottom:`1px solid ${domain.color}33` }}>{letter}</div>
                     {groups[letter].map(c => {
@@ -2686,10 +2687,10 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                             border:`1.5px solid ${STAGE_COLOR[c.stage]}55`,
                             display:"flex", alignItems:"center", justifyContent:"center" }}>
                             <span style={{ fontSize:13, color:STAGE_COLOR[c.stage],
-                              fontFamily:"Georgia, serif", fontWeight:600 }}>{c.name[0]}</span>
+                              fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontWeight:600 }}>{c.name[0]}</span>
                           </div>
                           <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif",
+                            <div style={{ fontSize:14, color:C.ink, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                               fontWeight:500 }}>{c.name}</div>
                             <div style={{ fontSize:11, color:C.inkLight, fontStyle:"italic",
                               overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
@@ -2705,7 +2706,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                             </div>
                             {c.lastContact && (
                               <div style={{ fontSize:9, color:C.inkFaint,
-                                fontFamily:"'Courier New', monospace" }}>{c.lastContact}</div>
+                                fontFamily:"'SF Mono','Fira Code',monospace" }}>{c.lastContact}</div>
                             )}
                           </div>
                         </div>
@@ -2727,7 +2728,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
                     <button key={l}
                       onClick={() => document.getElementById(`crm-letter-${l}`)?.scrollIntoView({ behavior:"smooth", block:"start" })}
                       style={{ background:"transparent", border:"none", color:domain.color,
-                        fontSize:10, fontWeight:700, fontFamily:"'Courier New', monospace",
+                        fontSize:10, fontWeight:700, fontFamily:"'SF Mono','Fira Code',monospace",
                         padding:"1px 4px", cursor:"pointer", lineHeight:1.4,
                         borderRadius:3, minWidth:18, textAlign:"center" }}>{l}</button>
                   ))}
@@ -2753,7 +2754,7 @@ Write in first person. Be concise. Return plain text, no markdown headers.` }]
           <button onClick={() => setAddingContact(true)}
             style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
               borderRadius:6, padding:"9px", color:C.inkFaint, fontSize:12, cursor:"pointer",
-              fontFamily:"Georgia, serif", fontStyle:"italic", marginTop:10 }}>+ Add person</button>
+              fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic", marginTop:10 }}>+ Add person</button>
         )}
       </div>
     );
@@ -2997,7 +2998,7 @@ Write in first person. Be concise. Plain text only.` }]
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4 }}>
           <button onClick={() => setSelectedProject(null)}
             style={{ background:"transparent", border:"none", color:domain.color,
-              cursor:"pointer", fontSize:12, fontFamily:"Georgia, serif", fontStyle:"italic", padding:0 }}>← projects</button>
+              cursor:"pointer", fontSize:12, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic", padding:0 }}>← projects</button>
           <button onClick={() => {
             if (!window.confirm(`Delete "${project.name}"?`)) return;
             setProjects(projects.filter(p => p.id !== selectedProject));
@@ -3017,8 +3018,8 @@ Write in first person. Be concise. Plain text only.` }]
                 style={{ background:project.status===s ? STATUS_COLORS[s] : "transparent",
                   color:project.status===s ? "#fff" : STATUS_COLORS[s],
                   border:`1.5px solid ${STATUS_COLORS[s]}`,
-                  borderRadius:20, padding:"2px 9px", fontSize:10, cursor:"pointer",
-                  fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{s}</button>
+                  borderRadius:6, padding:"3px 10px", fontSize:10, fontWeight:500, cursor:"pointer",
+                  fontFamily:"'SF Mono','Fira Code',monospace", textTransform:"capitalize" }}>{s}</button>
             ))}
           </div>
         </div>
@@ -3082,7 +3083,7 @@ Write in first person. Be concise. Plain text only.` }]
                       </div>
                       {/* Name — fixed width so bars align */}
                       <span style={{ fontSize:13, color: parent.done ? C.inkFaint : C.ink,
-                        fontFamily:"Georgia, serif",
+                        fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                         textDecoration: parent.done ? "line-through" : "none",
                         width:140, flexShrink:0, overflow:"hidden",
                         textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{parent.text}</span>
@@ -3096,10 +3097,10 @@ Write in first person. Be concise. Plain text only.` }]
                         )}
                       </div>
                       {/* Meta */}
-                      <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace", flexShrink:0, whiteSpace:"nowrap" }}>
+                      <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace", flexShrink:0, whiteSpace:"nowrap" }}>
                         {totalSubs > 0 ? `${doneSubs}/${totalSubs}` : (parent.due || "")}
                       </span>
-                      {parent.owner && <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace", flexShrink:0 }}>{parent.owner}</span>}
+                      {parent.owner && <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace", flexShrink:0 }}>{parent.owner}</span>}
                       <div style={{ flex:1 }} />
                       {/* Actions */}
                       <button onClick={() => setEditingMilestoneId(parent.id)}
@@ -3128,10 +3129,10 @@ Write in first person. Be concise. Plain text only.` }]
                                 background: child.done ? C.green : "transparent",
                                 cursor:"pointer" }} />
                             <span style={{ flex:1, fontSize:12, color: child.done ? C.inkFaint : C.inkMid,
-                              fontFamily:"Georgia, serif", fontStyle:"italic",
+                              fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
                               textDecoration: child.done ? "line-through" : "none" }}>{child.text}</span>
-                            {child.due && <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace", flexShrink:0 }}>{child.due}</span>}
-                            {child.owner && <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace", flexShrink:0 }}>{child.owner}</span>}
+                            {child.due && <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace", flexShrink:0 }}>{child.due}</span>}
+                            {child.owner && <span style={{ fontSize:9, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace", flexShrink:0 }}>{child.owner}</span>}
                             <button onClick={() => setEditingMilestoneId(child.id)}
                               style={{ background:"transparent", border:"none", color:C.inkFaint,
                                 cursor:"pointer", fontSize:9, padding:0, opacity:0.5 }}>✎</button>
@@ -3148,7 +3149,7 @@ Write in first person. Be concise. Plain text only.` }]
                       <button onClick={() => setAddingMilestone({ parentId: parent.id })}
                         style={{ background:"transparent", border:"none", color:C.inkFaint,
                           cursor:"pointer", fontSize:10, padding:"2px 0 2px 17px", display:"block",
-                          fontFamily:"Georgia, serif", fontStyle:"italic", opacity:0.6 }}>+ sub</button>
+                          fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic", opacity:0.6 }}>+ sub</button>
                     )}
                     {addingMilestone?.parentId === parent.id && (
                       <div style={{ paddingLeft:17 }}>
@@ -3171,7 +3172,7 @@ Write in first person. Be concise. Plain text only.` }]
             <button onClick={() => setAddingMilestone(true)}
               style={{ background:"transparent", border:"none", color:C.inkFaint,
                 fontSize:11, padding:"6px 0 0", cursor:"pointer",
-                fontFamily:"Georgia, serif", fontStyle:"italic" }}>+ milestone</button>
+                fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic" }}>+ milestone</button>
           )}
         </div>
 
@@ -3184,12 +3185,12 @@ Write in first person. Be concise. Plain text only.` }]
                 <button onClick={startProjRecording}
                   style={{ background:"transparent", border:`1.5px solid ${C.red}`,
                     borderRadius:4, color:C.red, fontSize:11, padding:"3px 10px",
-                    cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic" }}>🎙 record</button>
+                    cursor:"pointer", fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic" }}>🎙 record</button>
               )}
               <button onClick={() => granolaOpen==="project" ? setGranolaOpen(null) : openGranola("project")}
                 style={{ background:"transparent", border:`1.5px solid #16a34a`,
                   borderRadius:4, color:"#16a34a", fontSize:11, padding:"3px 10px",
-                  cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic" }}>🌿 Granola</button>
+                  cursor:"pointer", fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic" }}>🌿 Granola</button>
             </div>
           </div>
 
@@ -3215,7 +3216,7 @@ Write in first person. Be concise. Plain text only.` }]
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                   {projRecording && <div style={{ width:8, height:8, borderRadius:"50%",
                     background:C.red, animation:"pulse 1s infinite" }} />}
-                  <span style={{ fontSize:11, color:C.red, fontFamily:"'Courier New', monospace",
+                  <span style={{ fontSize:11, color:C.red, fontFamily:"'SF Mono','Fira Code',monospace",
                     textTransform:"uppercase", letterSpacing:"0.08em" }}>
                     {projRecording ? "Recording…" : projGenerating ? "Generating notes…" : "Review notes"}
                   </span>
@@ -3234,7 +3235,7 @@ Write in first person. Be concise. Plain text only.` }]
               </div>
               {(projRecording || projTranscript) && !projRecordedNotes && (
                 <div style={{ padding:"10px 12px", maxHeight:100, overflowY:"auto" }}>
-                  <div style={{ fontSize:13, color:C.inkMid, fontFamily:"Georgia, serif",
+                  <div style={{ fontSize:13, color:C.inkMid, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                     fontStyle:"italic", lineHeight:1.6 }}>
                     {projTranscript || <span style={{ opacity:0.4 }}>Start speaking…</span>}
                   </div>
@@ -3250,7 +3251,7 @@ Write in first person. Be concise. Plain text only.` }]
                   <textarea dir="ltr" value={projRecordedNotes}
                     onChange={e => setProjRecordedNotes(e.target.value)}
                     style={{ width:"100%", background:"transparent", border:"none",
-                      color:C.ink, fontSize:13, fontFamily:"Georgia, serif", fontStyle:"italic",
+                      color:C.ink, fontSize:13, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
                       lineHeight:1.7, padding:0, outline:"none", resize:"none",
                       boxSizing:"border-box", direction:"ltr", textAlign:"left",
                       unicodeBidi:"plaintext", minHeight:100 }} rows={5} />
@@ -3283,7 +3284,7 @@ Write in first person. Be concise. Plain text only.` }]
                     padding:"10px 0", cursor:"pointer" }}>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:10, color:domain.color,
-                      fontFamily:"'Courier New', monospace", marginBottom:2 }}>{n.date}</div>
+                      fontFamily:"'SF Mono','Fira Code',monospace", marginBottom:2 }}>{n.date}</div>
                     {!isExpanded && (
                       <div style={{ fontSize:12, color:C.inkFaint, fontStyle:"italic",
                         overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{preview}</div>
@@ -3316,7 +3317,7 @@ Write in first person. Be concise. Plain text only.` }]
                           suppressContentEditableWarning onKeyDown={noteKeyHandler}
                           dangerouslySetInnerHTML={{ __html: n.html }}
                           style={{ padding:10, minHeight:80, color:C.ink, background:"#fff", fontSize:13,
-                            fontFamily:"Georgia, serif", lineHeight:1.7, outline:"none",
+                            fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", lineHeight:1.7, outline:"none",
                             direction:"ltr", textAlign:"left" }} />
                         <div style={{ display:"flex", gap:6, padding:"5px 10px",
                           borderTop:`1px solid ${C.border}` }}>
@@ -3337,7 +3338,7 @@ Write in first person. Be concise. Plain text only.` }]
                     ) : (
                       <>
                         <div dangerouslySetInnerHTML={{ __html: n.html }}
-                          style={{ fontSize:13, color:C.ink, fontFamily:"Georgia, serif", lineHeight:1.7 }} />
+                          style={{ fontSize:13, color:C.ink, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", lineHeight:1.7 }} />
                         <div style={{ display:"flex", gap:8, marginTop:6 }}>
                           <button onClick={e=>{e.stopPropagation();setEditingProjNoteId(n.id);}}
                             style={{ background:"transparent", border:`1px solid ${C.borderMid}`,
@@ -3365,10 +3366,10 @@ Write in first person. Be concise. Plain text only.` }]
                     padding:"0 7px", height:22, cursor:"pointer", fontSize:11, color:C.inkMid, ...s }}>{icon}</button>
               ))}
             </div>
-            <div ref={projNoteRef} dir="ltr" contentEditable suppressContentEditableWarning
+            <div ref={projNoteRef} dir="ltr" contentEditable suppressContentEditableWarning suppressContentEditableWarning
               onKeyDown={noteKeyHandler} data-placeholder="Add a note…"
               style={{ minHeight:70, padding:10, outline:"none", fontSize:13, background:"#fff",
-                fontFamily:"Georgia, serif", lineHeight:1.7, color:C.ink, direction:"ltr" }} />
+                fontFamily:"Georgia,serif", lineHeight:1.7, color:C.ink, direction:"ltr" }} />
             <div style={{ padding:"5px 10px", borderTop:`1px solid ${C.border}`, textAlign:"right" }}>
               <button onClick={addProjectNote}
                 style={{ background:domain.color, border:"none", borderRadius:4, color:"#fff",
@@ -3386,19 +3387,19 @@ Write in first person. Be concise. Plain text only.` }]
               <div style={{ width:30, height:30, borderRadius:4, background:domain.colorLight,
                 border:`1px solid ${domain.color}33`, display:"flex", alignItems:"center",
                 justifyContent:"center", flexShrink:0 }}>
-                <span style={{ fontSize:9, color:domain.color, fontFamily:"'Courier New', monospace" }}>
+                <span style={{ fontSize:9, color:domain.color, fontFamily:"'SF Mono','Fira Code',monospace" }}>
                   {f.name.split('.').pop().toUpperCase().slice(0,4)}
                 </span>
               </div>
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, color:C.ink, fontFamily:"Georgia, serif",
+                <div style={{ fontSize:13, color:C.ink, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                   overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{f.name}</div>
-                <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'Courier New', monospace" }}>
+                <div style={{ fontSize:9, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace" }}>
                   {f.date} · {(f.size/1024).toFixed(0)}KB
                 </div>
               </div>
               <a href={f.data} download={f.name}
-                style={{ fontSize:10, color:domain.color, fontFamily:"'Courier New', monospace",
+                style={{ fontSize:10, color:domain.color, fontFamily:"'SF Mono','Fira Code',monospace",
                   textDecoration:"none", flexShrink:0 }}>↓</a>
               <button onClick={() => updateProject("files",(project.files||[]).filter(x=>x.id!==f.id))}
                 style={{ background:"transparent", border:"none", color:C.inkFaint,
@@ -3410,7 +3411,7 @@ Write in first person. Be concise. Plain text only.` }]
           <button onClick={() => fileInputRef.current?.click()}
             style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
               borderRadius:6, padding:"8px", color:C.inkFaint, fontSize:11,
-              cursor:"pointer", fontFamily:"Georgia, serif", fontStyle:"italic", marginTop:6 }}>
+              cursor:"pointer", fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic", marginTop:6 }}>
             + Attach document
           </button>
         </div>
@@ -3467,16 +3468,16 @@ Write in first person. Be concise. Plain text only.` }]
               {/* Tap to open */}
               <div onClick={() => setSelectedProject(p.id)} style={{ flex:1, cursor:"pointer" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
-                  <span style={{ fontSize:14, color:C.ink, fontFamily:"Georgia, serif",
+                  <span style={{ fontSize:14, color:C.ink, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                     fontWeight:500 }}>{p.name}</span>
                   <span style={{ fontSize:9, color:STATUS_COLORS[p.status]||C.inkFaint,
                     background:(STATUS_COLORS[p.status]||C.inkFaint)+"18",
                     border:`1px solid ${STATUS_COLORS[p.status]||C.inkFaint}44`,
                     borderRadius:10, padding:"1px 7px",
-                    fontFamily:"'Courier New', monospace", textTransform:"capitalize" }}>{p.status}</span>
+                    fontFamily:"'SF Mono','Fira Code',monospace", textTransform:"capitalize" }}>{p.status}</span>
                 </div>
                 {p.northStar && (
-                  <div style={{ fontSize:11, color:domain.color, fontFamily:"'Courier New', monospace",
+                  <div style={{ fontSize:11, color:domain.color, fontFamily:"'SF Mono','Fira Code',monospace",
                     marginBottom:2 }}>◎ {p.northStar}</div>
                 )}
                 {p.goal && (
@@ -3495,7 +3496,7 @@ Write in first person. Be concise. Plain text only.` }]
                           borderRadius:2, transition:"width 0.3s" }} />
                       </div>
                       <span style={{ fontSize:9, color:C.inkFaint,
-                        fontFamily:"'Courier New', monospace", flexShrink:0 }}>
+                        fontFamily:"'SF Mono','Fira Code',monospace", flexShrink:0 }}>
                         {done}/{total} milestones
                       </span>
                     </div>
@@ -3530,7 +3531,7 @@ Write in first person. Be concise. Plain text only.` }]
           <button onClick={() => setAddingProject(true)}
             style={{ width:"100%", background:"transparent", border:`1px dashed ${C.borderMid}`,
               borderRadius:6, padding:"9px", color:C.inkFaint, fontSize:12, cursor:"pointer",
-              fontFamily:"Georgia, serif", fontStyle:"italic", marginTop:10 }}>+ Add project</button>
+              fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic", marginTop:10 }}>+ Add project</button>
         )}
       </div>
     );
@@ -3550,7 +3551,7 @@ Write in first person. Be concise. Plain text only.` }]
             background: tab===t.id ? domain.color : "transparent",
             color: tab===t.id ? "#fff" : C.inkFaint,
             padding:"8px 4px", fontSize:12, cursor:"pointer",
-            fontFamily:"Georgia, serif", fontStyle:"italic",
+            fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
             fontWeight: tab===t.id ? 600 : 400,
             boxShadow: tab===t.id ? `0 1px 4px ${domain.color}44` : "none",
             transition:"all 0.15s" }}>{t.label}</button>
@@ -3567,12 +3568,65 @@ Write in first person. Be concise. Plain text only.` }]
 
 // ── DOMAIN VIEW ───────────────────────────────────────────────────────────────
 // ── BODY DOMAIN VIEW ─────────────────────────────────────────────────────────
+function RingGauge({ value, max=100, size=80, stroke=7, color, bg, label, sub, center }) {
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const pct = Math.min(1, Math.max(0, (value||0) / max));
+  const dash = pct * circ;
+  return (
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+      <div style={{ position:"relative", width:size, height:size }}>
+        <svg width={size} height={size} style={{ transform:"rotate(-90deg)" }}>
+          <circle cx={size/2} cy={size/2} r={r} fill="none"
+            stroke={bg||"#e8e4dd"} strokeWidth={stroke} />
+          <circle cx={size/2} cy={size/2} r={r} fill="none"
+            stroke={color} strokeWidth={stroke} strokeLinecap="round"
+            strokeDasharray={`${dash} ${circ}`}
+            style={{ transition:"stroke-dasharray 0.6s ease" }}/>
+        </svg>
+        <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column",
+          alignItems:"center", justifyContent:"center" }}>
+          {center}
+        </div>
+      </div>
+      {label && <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
+        textTransform:"uppercase", letterSpacing:"0.07em", textAlign:"center" }}>{label}</div>}
+      {sub && <div style={{ fontSize:11, color:C.inkMid, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
+        fontStyle:"italic", textAlign:"center" }}>{sub}</div>}
+    </div>
+  );
+}
+
+function SparkLine({ data, color, height=28, filled=true }) {
+  if (!data || data.length < 2) return null;
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const w = 100, h = height;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / range) * (h - 4) - 2;
+    return `${x},${y}`;
+  }).join(" ");
+  const area = `M0,${h} L${pts.split(" ").map(p => `L${p}`).join(" ").slice(1)} L${w},${h} Z`;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ width:"100%", height, display:"block" }}>
+      {filled && <path d={area} fill={color} opacity={0.15}/>}
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
 function BodyDomainView({ domain, onUpdate, onBack }) {
-  const [daily, setDaily]     = useState([]);
-  const [activities, setActs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab]         = useState("exercise");
+  const [daily, setDaily]       = useState([]);
+  const [activities, setActs]   = useState([]);
+  const [meals, setMeals]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [tab, setTab]           = useState("exercise");
   const [lastSync, setLastSync] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [mealNote, setMealNote]   = useState("");
+  const foodInputRef = useRef(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -3584,6 +3638,8 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
       ]);
       if (Array.isArray(d)) setDaily(d);
       if (Array.isArray(a)) setActs(a);
+      // Load meals from domain state
+      setMeals(domain.meals || []);
       setLastSync(new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}));
     } catch(e) { console.error(e); }
     setLoading(false);
@@ -3591,12 +3647,14 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
 
   useEffect(() => { loadData(); }, []);
 
-  // ── Derived metrics ───────────────────────────────────────────────────────
-  const today = daily[0];
-  const week7 = daily.slice(0, 7);
-  const week14 = daily.slice(0, 14);
+  // ── Data ─────────────────────────────────────────────────────────────────
+  const today    = daily[0];
+  const week7    = daily.slice(0, 7);
+  const week14   = daily.slice(0, 14);
+  const runs     = activities.filter(a => a.activity_type === "running");
+  const strength = activities.filter(a => a.activity_type === "strength_training");
+  const allExercise = activities.filter(a => !["meditation"].includes(a.activity_type));
 
-  // Exercise streak — consecutive days with at least one activity
   const actDates = new Set(activities.map(a => a.date));
   let streak = 0;
   for (let i = 0; i < 30; i++) {
@@ -3606,91 +3664,78 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
     else if (i > 0) break;
   }
 
-  const runs = activities.filter(a => a.activity_type === "running");
-  const strength = activities.filter(a => a.activity_type === "strength_training");
-  const allExercise = activities.filter(a => !["meditation"].includes(a.activity_type));
-
   const week7Acts = allExercise.filter(a => {
     const d = new Date(a.date);
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
     return d >= cutoff;
   });
-
   const avgDuration = week7Acts.length
-    ? Math.round(week7Acts.reduce((s, a) => s + (a.duration_seconds||0), 0) / week7Acts.length / 60)
-    : null;
-
-  const weekRunKm = runs.slice(0, 7).reduce((s, a) => s + ((a.distance_meters||0)/1000), 0);
-  const avgRunKm  = runs.length ? runs.slice(0,10).reduce((s,a) => s+(a.distance_meters||0)/1000, 0) / Math.min(runs.length,10) : 0;
-  const avgRunHR  = runs.filter(r=>r.avg_hr).slice(0,10);
-  const avgHR     = avgRunHR.length ? Math.round(avgRunHR.reduce((s,r)=>s+r.avg_hr,0)/avgRunHR.length) : null;
+    ? Math.round(week7Acts.reduce((s,a) => s+(a.duration_seconds||0),0) / week7Acts.length / 60) : null;
+  const weekRunKm = runs.slice(0,7).reduce((s,a) => s+((a.distance_meters||0)/1000), 0);
+  const avgRunKm  = runs.length ? runs.slice(0,10).reduce((s,a)=>s+(a.distance_meters||0)/1000,0)/Math.min(runs.length,10) : 0;
+  const avgHRRuns = runs.filter(r=>r.avg_hr).slice(0,10);
+  const avgRunHR  = avgHRRuns.length ? Math.round(avgHRRuns.reduce((s,r)=>s+r.avg_hr,0)/avgHRRuns.length) : null;
   const bestPace  = runs.filter(r=>r.avg_pace_min_per_km).sort((a,b)=>a.avg_pace_min_per_km-b.avg_pace_min_per_km)[0];
-
-  // Sleep — from daily (device doesn't support stages, so show available)
-  const sleepDays = week7.filter(d => d.sleep_hrs);
-  const avgSleep  = sleepDays.length ? sleepDays.reduce((s,d)=>s+d.sleep_hrs,0)/sleepDays.length : null;
-  const sleepGoal = 7.5;
-  const sleepDebt = avgSleep ? Math.max(0, sleepGoal - avgSleep) * 7 : null;
-
-  // Health
   const avgStress7 = week7.filter(d=>d.stress_avg).length
-    ? Math.round(week7.filter(d=>d.stress_avg).reduce((s,d)=>s+d.stress_avg,0)/week7.filter(d=>d.stress_avg).length)
-    : null;
+    ? Math.round(week7.filter(d=>d.stress_avg).reduce((s,d)=>s+d.stress_avg,0)/week7.filter(d=>d.stress_avg).length) : null;
   const avgRHR = week7.filter(d=>d.resting_hr).length
-    ? Math.round(week7.filter(d=>d.resting_hr).reduce((s,d)=>s+d.resting_hr,0)/week7.filter(d=>d.resting_hr).length)
-    : null;
+    ? Math.round(week7.filter(d=>d.resting_hr).reduce((s,d)=>s+d.resting_hr,0)/week7.filter(d=>d.resting_hr).length) : null;
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  const fmt = (v, unit="", dec=0) => v != null ? `${Number(v).toFixed(dec)}${unit}` : "—";
   const stressColor = v => v==null?C.inkFaint:v<26?C.green:v<51?C.gold:C.red;
   const scoreColor  = (v,lo,hi) => v==null?C.inkFaint:v>=hi?C.green:v>=lo?C.gold:C.red;
-
   const formatDur = secs => {
     if (!secs) return "—";
     const m = Math.round(secs/60);
-    return m>=60 ? `${Math.floor(m/60)}h${m%60?""+m%60+"m":""}` : `${m}min`;
+    return m>=60 ? `${Math.floor(m/60)}h${m%60?m%60+"m":""}` : `${m}m`;
+  };
+  const actIcon = type => ({running:"🏃",strength_training:"💪",cycling:"🚴",swimming:"🏊",meditation:"🧘",walking:"🚶",yoga:"🧘",hiking:"🥾"}[type]||"⚡");
+
+  // ── Food photo analysis ───────────────────────────────────────────────────
+  const analyzeFood = async (file) => {
+    setAnalyzing(true);
+    try {
+      const base64 = await new Promise((res,rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result.split(",")[1]);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const resp = await fetch("/api/claude", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model:"claude-sonnet-4-20250514", max_tokens:500,
+          messages:[{ role:"user", content:[
+            { type:"image", source:{ type:"base64", media_type:file.type||"image/jpeg", data:base64 }},
+            { type:"text", text:`Analyze this food image and estimate nutritional content. Return ONLY JSON:
+{"name":"meal name","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"notes":"brief description"}
+Be concise. Estimate realistically. No markdown, no explanation.` }
+          ]}]
+        })
+      });
+      const data = await resp.json();
+      const text = data.content?.find(b=>b.type==="text")?.text||"{}";
+      const meal = JSON.parse(text.replace(/```json|```/g,"").trim());
+      const newMeal = { ...meal, id:`meal${Date.now()}`,
+        date: new Date().toISOString().split("T")[0],
+        time: new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}),
+        note: mealNote,
+      };
+      const updated = [newMeal, ...(domain.meals||[])];
+      setMeals(updated);
+      onUpdate({ ...domain, meals: updated });
+      setMealNote("");
+    } catch(e) { console.error("Food analysis failed:", e); }
+    setAnalyzing(false);
   };
 
-  const actIcon = type => ({
-    running:"🏃",strength_training:"💪",cycling:"🚴",swimming:"🏊",
-    meditation:"🧘",walking:"🚶",yoga:"🧘",hiking:"🥾"
-  }[type]||"⚡");
+  const todayMeals = meals.filter(m => m.date === new Date().toISOString().split("T")[0]);
+  const totalCalories = todayMeals.reduce((s,m)=>s+(m.calories||0),0);
+  const totalProtein  = todayMeals.reduce((s,m)=>s+(m.protein_g||0),0);
+  const totalCarbs    = todayMeals.reduce((s,m)=>s+(m.carbs_g||0),0);
+  const totalFat      = todayMeals.reduce((s,m)=>s+(m.fat_g||0),0);
+  const calGoal = 2200;
 
-  const StatCard = ({label, value, sub, color}) => (
-    <div style={{minWidth:80, flex:1}}>
-      <div style={{fontSize:9,color:C.inkFaint,fontFamily:"'Courier New',monospace",
-        textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{label}</div>
-      <div style={{fontSize:22,color:color||C.ink,fontFamily:"Georgia,serif",fontWeight:600,lineHeight:1}}>{value}</div>
-      {sub && <div style={{fontSize:9,color:C.inkFaint,fontFamily:"'Courier New',monospace",marginTop:2}}>{sub}</div>}
-    </div>
-  );
-
-  const MiniBar = ({data, getVal, getColor, maxVal, getLabel}) => {
-    const max = maxVal || Math.max(...data.map(getVal), 1);
-    return (
-      <div style={{display:"flex",gap:3,alignItems:"flex-end",height:52}}>
-        {[...data].reverse().map((d,i) => {
-          const v = getVal(d);
-          const pct = v/max;
-          return (
-            <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-              <div style={{width:"100%",height:Math.max(2,Math.round(pct*44)),
-                background:getColor?getColor(d,i,data.length):domain.color,
-                borderRadius:"2px 2px 0 0",opacity:i===data.length-1?1:0.6}}/>
-              {getLabel && <div style={{fontSize:7,color:C.inkFaint,fontFamily:"'Courier New',monospace"}}>{getLabel(d)}</div>}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  const TABS = [
-    {id:"exercise",label:"Exercise"},
-    {id:"sleep",   label:"Sleep"},
-    {id:"health",  label:"Health"},
-    {id:"nutrition",label:"Nutrition"},
-  ];
+  const TABS = [{id:"exercise",label:"Exercise"},{id:"sleep",label:"Sleep"},{id:"health",label:"Health"},{id:"nutrition",label:"Nutrition"}];
 
   return (
     <div>
@@ -3703,253 +3748,329 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
           <div style={{flex:1,height:1,background:`linear-gradient(to left,transparent,${domain.color}66)`}}/>
         </div>
         <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8}}>
-          {lastSync&&<span style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace"}}>synced {lastSync}</span>}
+          {lastSync&&<span style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>synced {lastSync}</span>}
           <button onClick={loadData} disabled={loading}
-            style={{background:"transparent",border:`1px solid ${C.borderMid}`,
-              borderRadius:4,color:C.inkFaint,fontSize:10,padding:"2px 8px",
-              cursor:loading?"default":"pointer"}}>
-            {loading?"…":"↻ Sync"}
+            style={{background:"transparent",border:`1px solid ${C.borderMid}`,borderRadius:4,
+              color:C.inkFaint,fontSize:10,padding:"2px 8px",cursor:loading?"default":"pointer"}}>
+            {loading?"…":"↻"}
           </button>
         </div>
       </div>
 
-      {/* Tab pills */}
-      <div style={{display:"flex",gap:6,marginBottom:16,
-        background:C.surface,borderRadius:8,padding:4,border:`1px solid ${C.border}`}}>
-        {TABS.map(t => (
+      {/* Tabs */}
+      <div style={{display:"flex",gap:5,marginBottom:16,background:C.surface,
+        borderRadius:8,padding:4,border:`1px solid ${C.border}`}}>
+        {TABS.map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
             style={{flex:1,border:"none",borderRadius:6,
               background:tab===t.id?domain.color:"transparent",
-              color:tab===t.id?"#fff":C.inkFaint,
-              padding:"7px 4px",fontSize:11,cursor:"pointer",
-              fontFamily:"Georgia,serif",fontStyle:"italic",
-              fontWeight:tab===t.id?600:400,
-              boxShadow:tab===t.id?`0 1px 4px ${domain.color}44`:"none",
+              color:tab===t.id?"#fff":C.inkFaint,padding:"7px 2px",fontSize:11,cursor:"pointer",
+              fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontStyle:"italic",fontWeight:tab===t.id?600:400,
               transition:"all 0.15s"}}>{t.label}</button>
         ))}
       </div>
 
       {loading ? (
         <div style={{textAlign:"center",padding:"30px 0",fontSize:13,color:C.inkFaint,fontStyle:"italic"}}>Loading…</div>
-      ) : daily.length===0 ? (
-        <div style={{textAlign:"center",padding:"30px 0"}}>
-          <div style={{fontSize:13,color:C.inkFaint,fontStyle:"italic",marginBottom:6}}>No data yet.</div>
-          <div style={{fontSize:11,color:C.inkFaint,fontFamily:"'Courier New',monospace"}}>Run: python3 ~/garmin_sync.py</div>
-        </div>
       ) : (
 
-        // ── EXERCISE TAB ────────────────────────────────────────────────────
-        tab==="exercise" ? (
-          <div>
-            {/* Key stats row */}
-            <div style={{display:"flex",flexWrap:"wrap",gap:14,marginBottom:20,
-              paddingBottom:16,borderBottom:`1px solid ${C.border}`}}>
-              <StatCard label="Streak" value={streak>0?`${streak}d`:"—"}
-                sub="consecutive days" color={scoreColor(streak,3,7)}/>
-              <StatCard label="This week" value={week7Acts.length} sub="sessions"/>
-              <StatCard label="Avg duration" value={avgDuration?`${avgDuration}m`:"—"} sub="per session"/>
-              <StatCard label="Weekly km" value={weekRunKm>0?`${weekRunKm.toFixed(1)}km`:"—"} sub="running"/>
+      tab==="exercise" ? (
+        <div>
+          {/* Ring gauges row */}
+          <div style={{display:"flex",justifyContent:"space-around",
+            padding:"16px 0 20px",borderBottom:`1px solid ${C.border}`,marginBottom:18}}>
+            <RingGauge value={streak} max={14} size={86} stroke={7}
+              color={scoreColor(streak,3,7)}
+              label="Streak" sub={`${streak}d`}
+              center={<span style={{fontSize:18,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontWeight:700,color:C.ink}}>{streak}</span>}/>
+            <RingGauge value={week7Acts.length} max={7} size={86} stroke={7}
+              color={scoreColor(week7Acts.length,3,5)}
+              label="This week" sub={`${week7Acts.length}/7`}
+              center={<span style={{fontSize:18,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontWeight:700,color:C.ink}}>{week7Acts.length}</span>}/>
+            <RingGauge value={avgDuration||0} max={90} size={86} stroke={7}
+              color={domain.color}
+              label="Avg min" sub={avgDuration?`${avgDuration}m`:"—"}
+              center={<span style={{fontSize:18,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontWeight:700,color:C.ink}}>{avgDuration||"—"}</span>}/>
+            <RingGauge value={weekRunKm} max={50} size={86} stroke={7}
+              color={C.green}
+              label="km/week" sub={weekRunKm>0?`${weekRunKm.toFixed(1)}km`:"—"}
+              center={<span style={{fontSize:15,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontWeight:700,color:C.ink}}>{weekRunKm>0?weekRunKm.toFixed(1):"—"}</span>}/>
+          </div>
+
+          {/* Run distance sparkline */}
+          {runs.length>1 && (
+            <div style={{marginBottom:18,paddingBottom:18,borderBottom:`1px solid ${C.border}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <span style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                  textTransform:"uppercase",letterSpacing:"0.07em"}}>Run distance</span>
+                <div style={{display:"flex",gap:14}}>
+                  {avgRunHR&&<span style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>avg {avgRunHR}bpm</span>}
+                  {bestPace&&<span style={{fontSize:10,color:C.green,fontFamily:"'SF Mono','Fira Code',monospace"}}>best {bestPace.avg_pace_min_per_km.toFixed(2)} min/km</span>}
+                  <span style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>{runs.slice(0,10).length} runs</span>
+                </div>
+              </div>
+              <SparkLine data={[...runs.slice(0,10)].reverse().map(r=>(r.distance_meters||0)/1000)}
+                color={domain.color} height={40}/>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
+                <span style={{fontSize:9,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>{runs[runs.length>10?9:runs.length-1]?.date?.slice(5)}</span>
+                <span style={{fontSize:9,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>{runs[0]?.date?.slice(5)}</span>
+              </div>
             </div>
+          )}
 
-            {/* Running stats */}
-            {runs.length>0 && (
-              <div style={{marginBottom:20,paddingBottom:16,borderBottom:`1px solid ${C.border}`}}>
-                <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",
-                  textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Running</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:14,marginBottom:14}}>
-                  <StatCard label="Avg distance" value={`${avgRunKm.toFixed(1)}km`} sub="per run"/>
-                  <StatCard label="Avg HR" value={avgHR?`${avgHR}bpm`:"—"} sub="during run"
-                    color={avgHR?scoreColor(200-avgHR,100,140):undefined}/>
-                  <StatCard label="Best pace" value={bestPace?`${bestPace.avg_pace_min_per_km.toFixed(2)}`:"—"}
-                    sub="min/km" color={C.green}/>
-                  <StatCard label="Total runs" value={runs.length} sub="last 30 days"/>
-                </div>
-
-                {/* Run distance bars */}
-                {runs.slice(0,10).length>1 && (
-                  <>
-                    <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",marginBottom:6}}>
-                      Distance per run (km)
-                    </div>
-                    <MiniBar
-                      data={runs.slice(0,10)}
-                      getVal={a=>(a.distance_meters||0)/1000}
-                      getColor={(_,i,len)=>i===len-1?domain.color:`${domain.color}77`}
-                      getLabel={a=>a.date?.slice(5)}/>
-                  </>
-                )}
+          {/* Strength */}
+          {strength.length>0&&(
+            <div style={{marginBottom:18,paddingBottom:18,borderBottom:`1px solid ${C.border}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <span style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                  textTransform:"uppercase",letterSpacing:"0.07em"}}>Strength</span>
+                <span style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>
+                  {strength.length} sessions · avg {formatDur(strength.reduce((s,a)=>s+(a.duration_seconds||0),0)/strength.length)}
+                </span>
               </div>
-            )}
+              <SparkLine data={[...strength.slice(0,10)].reverse().map(a=>(a.duration_seconds||0)/60)}
+                color="#8b6f47" height={28}/>
+            </div>
+          )}
 
-            {/* Strength */}
-            {strength.length>0 && (
-              <div style={{marginBottom:20,paddingBottom:16,borderBottom:`1px solid ${C.border}`}}>
-                <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",
-                  textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Strength training</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:14}}>
-                  <StatCard label="Sessions" value={strength.length} sub="last 30 days"/>
-                  <StatCard label="Avg duration"
-                    value={formatDur(strength.reduce((s,a)=>s+(a.duration_seconds||0),0)/strength.length)}
-                    sub="per session"/>
+          {/* Activity log */}
+          <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+            textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>Recent</div>
+          {allExercise.slice(0,10).map((a,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:10,
+              padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
+              <span style={{fontSize:15,flexShrink:0}}>{actIcon(a.activity_type)}</span>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,color:C.ink,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
+                  overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  {a.name||a.activity_type?.replace(/_/g," ")}
+                </div>
+                <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>
+                  {a.date}{a.avg_hr?` · ${Math.round(a.avg_hr)}bpm`:""}
+                  {a.avg_pace_min_per_km?` · ${a.avg_pace_min_per_km.toFixed(2)}/km`:""}
                 </div>
               </div>
-            )}
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div style={{fontSize:12,color:C.inkMid,fontFamily:"'SF Mono','Fira Code',monospace"}}>{formatDur(a.duration_seconds)}</div>
+                {a.distance_meters>100&&<div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>{(a.distance_meters/1000).toFixed(1)}km</div>}
+              </div>
+            </div>
+          ))}
+        </div>
 
-            {/* Activity log */}
-            <div>
-              <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",
-                textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Recent activities</div>
-              {allExercise.slice(0,12).map((a,i)=>(
+      ) : tab==="sleep" ? (
+        <div>
+          <div style={{textAlign:"center",padding:"20px 0 10px"}}>
+            <div style={{fontSize:13,color:C.inkFaint,fontStyle:"italic",marginBottom:8}}>
+              Sleep stage tracking not available on your device.
+            </div>
+            <div style={{fontSize:11,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",marginBottom:16}}>
+              Your Garmin doesn't report sleep stages (deviceRemCapable: false).<br/>
+              To unlock: Fenix 7, Forerunner 965, or Venu 3.
+            </div>
+            {/* Best practice guidelines */}
+            <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,
+              padding:16,textAlign:"left"}}>
+              <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>Sleep targets</div>
+              {[
+                {label:"Total sleep",target:"7.5–9h",icon:"🌙"},
+                {label:"Deep sleep",target:"13–23% of total",icon:"💤"},
+                {label:"REM sleep",target:"20–25% of total",icon:"🧠"},
+                {label:"Bedtime consistency",target:"±30min variance",icon:"⏰"},
+              ].map((r,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:10,
-                  padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
-                  <span style={{fontSize:15,flexShrink:0}}>{actIcon(a.activity_type)}</span>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,color:C.ink,fontFamily:"Georgia,serif",
-                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                      {a.name||a.activity_type?.replace(/_/g," ")}
-                    </div>
-                    <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace"}}>
-                      {a.date}{a.avg_hr?` · ${Math.round(a.avg_hr)}bpm`:""}
-                      {a.avg_pace_min_per_km?` · ${a.avg_pace_min_per_km.toFixed(2)}min/km`:""}
-                    </div>
-                  </div>
-                  <div style={{textAlign:"right",flexShrink:0}}>
-                    <div style={{fontSize:12,color:C.inkMid,fontFamily:"'Courier New',monospace"}}>{formatDur(a.duration_seconds)}</div>
-                    {a.distance_meters>100&&<div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace"}}>{(a.distance_meters/1000).toFixed(1)}km</div>}
-                  </div>
+                  padding:"7px 0",borderBottom:i<3?`1px solid ${C.border}`:"none"}}>
+                  <span style={{fontSize:16,flexShrink:0}}>{r.icon}</span>
+                  <span style={{flex:1,fontSize:13,color:C.ink,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif"}}>{r.label}</span>
+                  <span style={{fontSize:11,color:domain.color,fontFamily:"'SF Mono','Fira Code',monospace"}}>{r.target}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+      ) : tab==="health" ? (
+        <div>
+          {/* Ring gauges */}
+          <div style={{display:"flex",justifyContent:"space-around",
+            padding:"16px 0 20px",borderBottom:`1px solid ${C.border}`,marginBottom:18}}>
+            <RingGauge value={100-(today?.resting_hr||60)} max={60} size={86} stroke={7}
+              color={scoreColor(80-(today?.resting_hr||60),10,30)}
+              label="Resting HR" sub={today?.resting_hr?`${today.resting_hr}bpm`:"—"}
+              center={<span style={{fontSize:16,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontWeight:700,color:C.ink}}>{today?.resting_hr||"—"}</span>}/>
+            <RingGauge value={today?.stress_avg?100-today.stress_avg:50} max={100} size={86} stroke={7}
+              color={stressColor(today?.stress_avg)}
+              label="Stress" sub={today?.stress_avg?Math.round(today.stress_avg):"—"}
+              center={<div style={{textAlign:"center"}}>
+                <div style={{fontSize:16,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontWeight:700,color:stressColor(today?.stress_avg)}}>
+                  {today?.stress_avg?Math.round(today.stress_avg):"—"}
+                </div>
+              </div>}/>
+            <RingGauge value={today?.steps||0} max={today?.goal_steps||11000} size={86} stroke={7}
+              color={scoreColor((today?.steps||0)/(today?.goal_steps||11000)*100,50,90)}
+              label="Steps" sub={today?.steps?today.steps.toLocaleString():"—"}
+              center={<span style={{fontSize:12,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontWeight:700,color:C.ink}}>
+                {today?.steps?(today.steps/1000).toFixed(1)+"k":"—"}
+              </span>}/>
+          </div>
+
+          {/* Stress sparkline */}
+          <div style={{marginBottom:18,paddingBottom:18,borderBottom:`1px solid ${C.border}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <span style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                textTransform:"uppercase",letterSpacing:"0.07em"}}>Stress · 14 days</span>
+              <span style={{fontSize:10,color:stressColor(avgStress7),fontFamily:"'SF Mono','Fira Code',monospace"}}>
+                avg {avgStress7||"—"}
+              </span>
+            </div>
+            <SparkLine data={[...week14].reverse().map(d=>d.stress_avg||0)} color={stressColor(avgStress7)} height={44}/>
+            <div style={{display:"flex",gap:10,marginTop:6}}>
+              {[["<25","calm",C.green],["25–50","moderate",C.gold],["50+","high",C.red]].map(([v,l,c],i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:4}}>
+                  <div style={{width:6,height:6,borderRadius:"50%",background:c}}/>
+                  <span style={{fontSize:9,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>{v} {l}</span>
                 </div>
               ))}
             </div>
           </div>
 
-        // ── SLEEP TAB ───────────────────────────────────────────────────────
-        ) : tab==="sleep" ? (
-          <div>
-            {sleepDays.length===0 ? (
-              <div style={{textAlign:"center",padding:"20px 0"}}>
-                <div style={{fontSize:13,color:C.inkFaint,fontStyle:"italic"}}>
-                  Sleep data not available from your device.
-                </div>
-                <div style={{fontSize:11,color:C.inkFaint,fontFamily:"'Courier New',monospace",marginTop:6}}>
-                  Your Garmin doesn't report sleep stages (deviceRemCapable: false).
-                </div>
-                <div style={{fontSize:11,color:C.inkFaint,marginTop:10}}>
-                  Devices with Advanced Sleep Monitoring: Fenix 7, Forerunner 965, Venu 3
-                </div>
+          {/* Resting HR sparkline */}
+          <div style={{marginBottom:18,paddingBottom:18,borderBottom:`1px solid ${C.border}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <span style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                textTransform:"uppercase",letterSpacing:"0.07em"}}>Resting HR · 14 days</span>
+              <span style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>avg {avgRHR||"—"}bpm</span>
+            </div>
+            <SparkLine data={[...week14].reverse().map(d=>d.resting_hr||0)} color={domain.color} height={40}/>
+          </div>
+
+          {/* Daily log */}
+          <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+            textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>Daily log</div>
+          {week7.map((d,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8,
+              padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
+              <div style={{width:54,flexShrink:0,fontSize:10,
+                color:i===0?domain.color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>{d.date?.slice(5)}</div>
+              <div style={{display:"flex",gap:10,flex:1,flexWrap:"wrap",alignItems:"center"}}>
+                {d.steps&&<span style={{fontSize:11,color:C.inkMid,fontFamily:"'SF Mono','Fira Code',monospace"}}>{d.steps.toLocaleString()}</span>}
+                {d.stress_avg&&<span style={{fontSize:11,color:stressColor(d.stress_avg),fontFamily:"'SF Mono','Fira Code',monospace"}}>s:{Math.round(d.stress_avg)}</span>}
+                {d.resting_hr&&<span style={{fontSize:11,color:C.inkMid,fontFamily:"'SF Mono','Fira Code',monospace"}}>{d.resting_hr}bpm</span>}
               </div>
-            ) : (
-              <div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:14,marginBottom:20,
-                  paddingBottom:16,borderBottom:`1px solid ${C.border}`}}>
-                  <StatCard label="Avg sleep" value={avgSleep?`${avgSleep.toFixed(1)}h`:"—"}
-                    sub="last 7 nights" color={scoreColor(avgSleep,6,7.5)}/>
-                  <StatCard label="Sleep debt" value={sleepDebt?`${sleepDebt.toFixed(1)}h`:"0h"}
-                    sub="vs 7.5h goal" color={sleepDebt>5?C.red:sleepDebt>2?C.gold:C.green}/>
-                  <StatCard label="Nights logged" value={sleepDays.length} sub="of last 7"/>
-                </div>
-                <MiniBar data={sleepDays.slice(0,7)}
-                  getVal={d=>d.sleep_hrs||0} maxVal={9}
-                  getColor={(d)=>scoreColor(d.sleep_hrs,6,7.5)}
-                  getLabel={d=>d.date?.slice(5)}/>
-              </div>
+              {d.stress_qualifier&&<span style={{fontSize:9,color:C.inkFaint,fontStyle:"italic",
+                textAlign:"right",flexShrink:0,maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {d.stress_qualifier.toLowerCase().replace(/_/g," ")}
+              </span>}
+            </div>
+          ))}
+        </div>
+
+      ) : (
+        // ── NUTRITION ───────────────────────────────────────────────────────
+        <div>
+          {/* Today summary rings */}
+          {todayMeals.length>0 && (
+            <div style={{display:"flex",justifyContent:"space-around",
+              padding:"12px 0 16px",borderBottom:`1px solid ${C.border}`,marginBottom:16}}>
+              <RingGauge value={totalCalories} max={calGoal} size={80} stroke={7}
+                color={totalCalories/calGoal>1?C.red:domain.color}
+                label="Calories" sub={`${totalCalories}/${calGoal}`}
+                center={<span style={{fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontWeight:700,color:C.ink}}>{totalCalories}</span>}/>
+              <RingGauge value={totalProtein} max={150} size={80} stroke={7} color={C.green}
+                label="Protein" sub={`${Math.round(totalProtein)}g`}
+                center={<span style={{fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontWeight:700,color:C.ink}}>{Math.round(totalProtein)}</span>}/>
+              <RingGauge value={totalCarbs} max={250} size={80} stroke={7} color={C.gold}
+                label="Carbs" sub={`${Math.round(totalCarbs)}g`}
+                center={<span style={{fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontWeight:700,color:C.ink}}>{Math.round(totalCarbs)}</span>}/>
+              <RingGauge value={totalFat} max={80} size={80} stroke={7} color="#e8956d"
+                label="Fat" sub={`${Math.round(totalFat)}g`}
+                center={<span style={{fontSize:14,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontWeight:700,color:C.ink}}>{Math.round(totalFat)}</span>}/>
+            </div>
+          )}
+
+          {/* Photo snap button */}
+          <div style={{marginBottom:16}}>
+            <input ref={foodInputRef} type="file" accept="image/*" style={{display:"none"}}
+              onChange={e=>{if(e.target.files?.[0])analyzeFood(e.target.files[0]);}}/>
+            <button onClick={()=>foodInputRef.current?.click()} disabled={analyzing}
+              style={{width:"100%",background:analyzing?C.border:domain.color,
+                border:"none",borderRadius:8,color:"#fff",fontSize:13,
+                padding:"12px",cursor:analyzing?"default":"pointer",
+                fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontStyle:"italic",fontWeight:600}}>
+              {analyzing?"🔍 Analyzing…":"📷 Snap or upload a meal"}
+            </button>
+            {!analyzing && (
+              <input dir="ltr" value={mealNote} onChange={e=>setMealNote(e.target.value)}
+                placeholder="Add a note (optional)…"
+                style={{width:"100%",marginTop:6,background:"transparent",border:"none",
+                  borderBottom:`1px solid ${C.border}`,color:C.ink,fontSize:13,
+                  fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontStyle:"italic",padding:"4px 0",
+                  outline:"none",boxSizing:"border-box"}}/>
             )}
           </div>
 
-        // ── HEALTH TAB ──────────────────────────────────────────────────────
-        ) : tab==="health" ? (
-          <div>
-            {/* Key health stats */}
-            <div style={{display:"flex",flexWrap:"wrap",gap:14,marginBottom:20,
-              paddingBottom:16,borderBottom:`1px solid ${C.border}`}}>
-              <StatCard label="Resting HR" value={today?.resting_hr?`${today.resting_hr}bpm`:"—"}
-                sub="today" color={scoreColor(80-(today?.resting_hr||60),10,30)}/>
-              <StatCard label="Avg RHR" value={avgRHR?`${avgRHR}bpm`:"—"}
-                sub="7-day avg" color={scoreColor(80-(avgRHR||60),10,30)}/>
-              <StatCard label="Stress today" value={today?.stress_avg?Math.round(today.stress_avg):"—"}
-                sub={today?.stress_qualifier?.toLowerCase().replace(/_/g," ")||""}
-                color={stressColor(today?.stress_avg)}/>
-              <StatCard label="Avg stress" value={avgStress7?`${avgStress7}`:"—"}
-                sub="7-day avg" color={stressColor(avgStress7)}/>
-            </div>
-
-            {/* Stress chart */}
-            <div style={{marginBottom:20,paddingBottom:16,borderBottom:`1px solid ${C.border}`}}>
-              <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",
-                textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>
-                Stress · last 14 days
-              </div>
-              <MiniBar data={week14.filter(d=>d.stress_avg)} maxVal={100}
-                getVal={d=>d.stress_avg||0}
-                getColor={d=>stressColor(d.stress_avg)}
-                getLabel={d=>d.date?.slice(5)}/>
-              <div style={{display:"flex",gap:12,marginTop:8}}>
-                {["<25 calm","25-50 moderate","50+ high"].map((l,i)=>(
-                  <div key={i} style={{display:"flex",alignItems:"center",gap:4}}>
-                    <div style={{width:8,height:8,borderRadius:"50%",
-                      background:[C.green,C.gold,C.red][i]}}/>
-                    <span style={{fontSize:9,color:C.inkFaint,fontFamily:"'Courier New',monospace"}}>{l}</span>
+          {/* Today's meals */}
+          {todayMeals.length>0 && (
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>Today</div>
+              {todayMeals.map((m,i)=>(
+                <div key={i} style={{padding:"10px 0",borderBottom:`1px solid ${C.border}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                    <div>
+                      <div style={{fontSize:13,color:C.ink,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontWeight:500}}>{m.name}</div>
+                      {m.note&&<div style={{fontSize:11,color:C.inkFaint,fontStyle:"italic"}}>{m.note}</div>}
+                    </div>
+                    <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                      <span style={{fontSize:12,color:domain.color,fontFamily:"'SF Mono','Fira Code',monospace",fontWeight:600}}>{m.calories} cal</span>
+                      <button onClick={()=>{const updated=meals.filter((_,j)=>j!==meals.indexOf(m));setMeals(updated);onUpdate({...domain,meals:updated});}}
+                        style={{background:"transparent",border:"none",color:C.inkFaint,cursor:"pointer",fontSize:13,padding:0}}>×</button>
+                    </div>
                   </div>
-                ))}
-              </div>
+                  <div style={{display:"flex",gap:12}}>
+                    {[["P",m.protein_g,C.green],["C",m.carbs_g,C.gold],["F",m.fat_g,"#e8956d"]].map(([l,v,c])=>(
+                      <span key={l} style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>
+                        <span style={{color:c}}>{l}</span> {Math.round(v||0)}g
+                      </span>
+                    ))}
+                    <span style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",marginLeft:"auto"}}>{m.time}</span>
+                  </div>
+                  {m.notes&&<div style={{fontSize:11,color:C.inkFaint,fontStyle:"italic",marginTop:3}}>{m.notes}</div>}
+                </div>
+              ))}
             </div>
+          )}
 
-            {/* Resting HR chart */}
-            <div style={{marginBottom:20}}>
-              <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",
-                textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>
-                Resting HR · last 14 days
-              </div>
-              <MiniBar data={week14.filter(d=>d.resting_hr)} maxVal={100}
-                getVal={d=>d.resting_hr||0}
-                getColor={(_,i,len)=>i===len-1?domain.color:`${domain.color}66`}
-                getLabel={d=>d.date?.slice(5)}/>
-            </div>
-
-            {/* Daily log */}
+          {/* Past meals */}
+          {meals.filter(m=>m.date!==new Date().toISOString().split("T")[0]).length>0 && (
             <div>
-              <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'Courier New',monospace",
-                textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Daily log</div>
-              {week7.map((d,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"center",gap:10,
+              <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace",
+                textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:8}}>Previous meals</div>
+              {meals.filter(m=>m.date!==new Date().toISOString().split("T")[0]).slice(0,8).map((m,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
                   padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
-                  <div style={{width:60,flexShrink:0}}>
-                    <div style={{fontSize:11,color:i===0?domain.color:C.inkFaint,
-                      fontFamily:"'Courier New',monospace"}}>{d.date?.slice(5)}</div>
+                  <div>
+                    <div style={{fontSize:12,color:C.ink,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif"}}>{m.name}</div>
+                    <div style={{fontSize:10,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>{m.date}</div>
                   </div>
-                  <div style={{flex:1,display:"flex",gap:12,flexWrap:"wrap"}}>
-                    {d.steps&&<span style={{fontSize:11,color:C.inkMid,fontFamily:"'Courier New',monospace"}}>{d.steps.toLocaleString()} steps</span>}
-                    {d.stress_avg&&<span style={{fontSize:11,color:stressColor(d.stress_avg),fontFamily:"'Courier New',monospace"}}>stress {Math.round(d.stress_avg)}</span>}
-                    {d.resting_hr&&<span style={{fontSize:11,color:C.inkMid,fontFamily:"'Courier New',monospace"}}>{d.resting_hr}bpm</span>}
-                    {d.stress_qualifier&&<span style={{fontSize:10,color:C.inkFaint,fontStyle:"italic"}}>{d.stress_qualifier.toLowerCase().replace(/_/g," ")}</span>}
-                  </div>
+                  <span style={{fontSize:11,color:C.inkFaint,fontFamily:"'SF Mono','Fira Code',monospace"}}>{m.calories} cal</span>
                 </div>
               ))}
             </div>
-          </div>
+          )}
 
-        // ── NUTRITION TAB ───────────────────────────────────────────────────
-        ) : (
-          <div style={{textAlign:"center",padding:"30px 0"}}>
-            <div style={{fontSize:32,marginBottom:12}}>🥗</div>
-            <div style={{fontSize:14,color:C.ink,fontFamily:"Georgia,serif",marginBottom:8}}>
-              Nutrition tracking coming soon
+          {meals.length===0 && !analyzing && (
+            <div style={{textAlign:"center",padding:"20px 0",color:C.inkFaint,fontStyle:"italic",fontSize:13}}>
+              Snap your first meal to start tracking
             </div>
-            <div style={{fontSize:12,color:C.inkFaint,fontStyle:"italic",marginBottom:16}}>
-              Enable food logging in Garmin Connect to pull calorie and macro data here.
-            </div>
-            <div style={{fontSize:11,color:C.inkFaint,fontFamily:"'Courier New',monospace",
-              background:C.surface,border:`1px solid ${C.border}`,borderRadius:6,
-              padding:"10px 14px",textAlign:"left",maxWidth:300,margin:"0 auto"}}>
-              <div style={{marginBottom:4}}>Manual tracking options:</div>
-              <div>· Log meals in Garmin Connect</div>
-              <div>· Or connect MyFitnessPal to Garmin</div>
-            </div>
-          </div>
-        )
-      )}
+          )}
+        </div>
+      ))}
     </div>
   );
 }
+
 function DomainView({ domain, onUpdate, onBack }) {
   // Work has its own specialized view
   if (domain.id === "work") {
@@ -3971,7 +4092,7 @@ function DomainView({ domain, onUpdate, onBack }) {
     <div>
       {/* Domain header — editorial, matches home page */}
       <div style={{ paddingTop: 8, paddingBottom: 20, textAlign: "center" }}>
-        <div style={{ fontSize: 11, color: C.inkFaint, fontFamily: "'Courier New', monospace",
+        <div style={{ fontSize: 11, color: C.inkFaint, fontFamily: "'SF Mono','Fira Code',monospace",
           letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 14 }}>
           {domain.question}
         </div>
@@ -4019,7 +4140,7 @@ function DomainView({ domain, onUpdate, onBack }) {
             borderBottom: `2px solid ${tab === t.id ? domain.color : "transparent"}`,
             color: tab === t.id ? domain.color : C.inkFaint,
             padding: "10px 4px", fontSize: 11, cursor: "pointer",
-            fontFamily: "Georgia, serif", fontStyle: "italic",
+            fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
             transition: "all 0.12s", marginBottom: -1,
           }}>{t.label}</button>
         ))}
@@ -4035,11 +4156,11 @@ function DomainView({ domain, onUpdate, onBack }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               {domain.kpis.map(k => (
                 <div key={k.id} style={{ padding: "12px 0", borderBottom: `1px solid ${C.border}` }}>
-                  <div style={{ fontSize: 11, color: C.inkFaint, fontFamily: "Georgia, serif", fontStyle: "italic", marginBottom: 4 }}>{k.label}</div>
+                  <div style={{ fontSize: 11, color: C.inkFaint, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif", marginBottom: 4 }}>{k.label}</div>
                   <span style={{ fontSize: 22, fontWeight: 700, color: C.ink }}>{k.value}
                     <span style={{ fontSize: 11, fontWeight: 400, color: C.inkLight }}>{k.unit && ` ${k.unit}`}</span>
                   </span>
-                  {k.delta && <span style={{ fontSize: 11, color: k.delta.startsWith("+") ? C.green : C.red, marginLeft: 6, fontFamily: "'Courier New', monospace" }}>{k.delta}</span>}
+                  {k.delta && <span style={{ fontSize: 11, color: k.delta.startsWith("+") ? C.green : C.red, marginLeft: 6, fontFamily: "'SF Mono','Fira Code',monospace" }}>{k.delta}</span>}
                 </div>
               ))}
             </div>
@@ -4475,7 +4596,7 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
     <div>
       {/* Header */}
       <div style={{ paddingTop: 8, paddingBottom: 10, textAlign: "center" }}>
-        <div style={{ fontSize: 11, color: C.inkFaint, fontFamily: "'Courier New', monospace",
+        <div style={{ fontSize: 11, color: C.inkFaint, fontFamily: "'SF Mono','Fira Code',monospace",
           letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 8 }}>your whole week</div>
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 4 }}>
           <div style={{ flex: 1, height: 1, background: `linear-gradient(to right, transparent, ${C.borderMid})` }} />
@@ -4489,8 +4610,8 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
         <button onClick={() => setWeekOffset(w => w-1)} style={{ background:"transparent",border:"none",color:C.caqi,cursor:"pointer",fontSize:20,padding:"0 4px" }}>‹</button>
         <div style={{ textAlign:"center" }}>
-          <div style={{ fontSize:11, color:C.inkMid, fontFamily:"Georgia, serif", fontStyle:"italic" }}>{weekLabel}</div>
-          {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={{ background:"transparent",border:"none",color:C.caqi,cursor:"pointer",fontSize:10,fontFamily:"Georgia, serif",fontStyle:"italic",padding:0,marginTop:1 }}>this week</button>}
+          <div style={{ fontSize:11, color:C.inkMid, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic" }}>{weekLabel}</div>
+          {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={{ background:"transparent",border:"none",color:C.caqi,cursor:"pointer",fontSize:10,fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",fontStyle:"italic",padding:0,marginTop:1 }}>this week</button>}
         </div>
         <button onClick={() => setWeekOffset(w => w+1)} style={{ background:"transparent",border:"none",color:C.caqi,cursor:"pointer",fontSize:20,padding:"0 4px" }}>›</button>
       </div>
@@ -4499,7 +4620,7 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
       {isPlacing && (
         <div style={{ background: C.caqiLight, border:`1px solid ${C.caqi}44`, borderRadius:6,
           padding:"7px 12px", marginBottom:8, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <span style={{ fontSize:12, color:C.caqi, fontFamily:"Georgia, serif", fontStyle:"italic" }}>
+          <span style={{ fontSize:12, color:C.caqi, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic" }}>
             {`"${pickingActivity?.activity?.text}" — tap any slot to place · tap ✕ to stop`}
           </span>
           <button onClick={() => { setPickingActivity(null); setMovingBlock(null); }}
@@ -4514,7 +4635,7 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
           style={{ flex:1, background: scheduling ? C.border : C.navy,
             border:"none", borderRadius:6, color:"#fff", fontSize:12,
             padding:"8px 12px", cursor: scheduling ? "default" : "pointer",
-            fontFamily:"Georgia, serif", fontStyle:"italic", opacity: scheduling ? 0.6 : 1 }}>
+            fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic", opacity: scheduling ? 0.6 : 1 }}>
           {scheduling ? "Scheduling…" : "📋 Schedule todos around meetings"}
         </button>
 
@@ -4524,7 +4645,7 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
             border:`1.5px solid ${C.caqi}`, borderRadius:6,
             color: importing ? C.inkFaint : C.caqi, fontSize:12,
             padding:"8px 12px", cursor: importing ? "default" : "pointer",
-            fontFamily:"Georgia, serif", fontStyle:"italic" }}>
+            fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic" }}>
           {importing ? "Reading…" : "📷 Import from screenshot or PDF"}
         </button>
         <input ref={fileInputRef} type="file" accept="image/*,application/pdf"
@@ -4537,7 +4658,7 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
         <div style={{ background: C.caqiLight, border:`1px solid ${C.caqi}33`,
           borderRadius:6, padding:"8px 12px", marginBottom:8,
           display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <span style={{ fontSize:12, color:C.caqi, fontFamily:"Georgia, serif", fontStyle:"italic" }}>{importMsg}</span>
+          <span style={{ fontSize:12, color:C.caqi, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic" }}>{importMsg}</span>
           <button onClick={() => setImportMsg("")}
             style={{ background:"transparent", border:"none", color:C.caqi, cursor:"pointer", fontSize:14, padding:0 }}>✕</button>
         </div>
@@ -4559,9 +4680,9 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
             {weekDays.map(({ label, date }, i) => (
               <div key={i} style={{ width:COL_W, flexShrink:0, textAlign:"center", padding:"4px 0" }}>
                 <div style={{ fontSize:8, color:isToday(date)?C.caqi:C.inkFaint,
-                  fontFamily:"'Courier New', monospace" }}>{label}</div>
+                  fontFamily:"'SF Mono','Fira Code',monospace" }}>{label}</div>
                 <div style={{ fontSize:12, fontWeight:isToday(date)?700:400,
-                  color:isToday(date)?C.caqi:C.inkMid, fontFamily:"Georgia, serif" }}>{date.getDate()}</div>
+                  color:isToday(date)?C.caqi:C.inkMid, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif" }}>{date.getDate()}</div>
               </div>
             ))}
           </div>
@@ -4574,7 +4695,7 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
               <div key={h} style={{ position:"absolute", top:slot*SLOT_H, left:0, right:0,
                 display:"flex", alignItems:"flex-start", pointerEvents:"none", zIndex:1 }}>
                 <div style={{ width:LABEL_W, flexShrink:0, paddingRight:5, textAlign:"right",
-                  fontSize:8, color:C.inkFaint, fontFamily:"'Courier New', monospace",
+                  fontSize:8, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
                   paddingTop:1, lineHeight:1 }}>{slotLabel(slot)}</div>
                 <div style={{ flex:1, borderTop:`1px solid ${C.border}` }} />
               </div>
@@ -4670,7 +4791,7 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
 
                   {/* Label */}
                   <div style={{ fontSize:8, color:b.domainColor,
-                    fontFamily:"Georgia, serif", fontStyle:"italic",
+                    fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
                     padding:"4px 3px 2px", lineHeight:1.25,
                     overflow:"hidden", height:"calc(100% - 4px)",
                     pointerEvents:"none" }}>
@@ -4713,7 +4834,7 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
 
       {/* Domain strip */}
       <div style={{ marginTop:14, borderTop:`1px solid ${C.border}`, paddingTop:10 }}>
-        <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"Georgia, serif",
+        <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
           fontStyle:"italic", textAlign:"center", marginBottom:8 }}>
           tap a dimension to schedule
         </div>
@@ -4725,7 +4846,7 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
                 color: drawerDomain===d.id ? "#fff" : d.color,
                 border:`1.5px solid ${d.color}`, borderRadius:20,
                 padding:"3px 11px", fontSize:11, cursor:"pointer",
-                fontFamily:"Georgia, serif", fontStyle:"italic",
+                fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
                 transition:"all 0.12s" }}>{d.label}</button>
           ))}
         </div>
@@ -4738,7 +4859,7 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
           return (
             <div style={{ background:dom.colorLight, border:`1px solid ${dom.color}33`,
               borderRadius:8, padding:12 }}>
-              <div style={{ fontSize:11, color:dom.color, fontFamily:"Georgia, serif",
+              <div style={{ fontSize:11, color:dom.color, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                 fontStyle:"italic", marginBottom:8 }}>{dom.label}</div>
               <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
                 {acts.map(a => {
@@ -4750,7 +4871,7 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
                       border:`1px solid ${isPicking ? dom.color : C.border}`,
                       borderRadius:5 }}>
                       <div style={{ flex:1 }}>
-                        <div style={{ fontSize:12, color:C.ink, fontFamily:"Georgia, serif",
+                        <div style={{ fontSize:12, color:C.ink, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
                           fontStyle:"italic" }}>{a.text}</div>
                         <div style={{ display:"flex", gap:3, marginTop:3, flexWrap:"wrap" }}>
                           {weekDays.map(({ label }, i) => {
@@ -4761,7 +4882,7 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
                                 background: placed ? dom.color+"22" : "transparent",
                                 border:`1px solid ${placed ? dom.color+"55" : C.border}`,
                                 borderRadius:2, padding:"1px 3px",
-                                fontFamily:"'Courier New', monospace" }}>{label}</span>
+                                fontFamily:"'SF Mono','Fira Code',monospace" }}>{label}</span>
                             );
                           })}
                         </div>
@@ -4779,7 +4900,7 @@ Only return the JSON, nothing else. Use 24-hour time format. If you cannot deter
                           color: isPicking ? "#fff" : dom.color,
                           border:`1.5px solid ${dom.color}`, borderRadius:4,
                           padding:"3px 10px", fontSize:11, cursor:"pointer",
-                          fontFamily:"Georgia, serif", fontStyle:"italic",
+                          fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
                           flexShrink:0, transition:"all 0.12s" }}>
                         {isPicking ? "cancel" : "place"}
                       </button>
@@ -4846,7 +4967,7 @@ export default function App() {
 
   if (loading) return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center",
-      height:"100vh", background:C.bg, fontFamily:"Georgia, serif",
+      height:"100vh", background:C.bg, fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
       flexDirection:"column", gap:12 }}>
       <div style={{ width:36, height:36, borderRadius:"50%", background:C.caqi,
         display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -4857,16 +4978,16 @@ export default function App() {
   );
 
   return (
-    <div dir="ltr" style={{ background: C.bg, minHeight: "100vh", fontFamily: "Georgia, serif",
+    <div dir="ltr" style={{ background: C.bg, minHeight: "100vh", fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
       color: C.ink, maxWidth: 560, margin: "0 auto" }}>
 
       {(selected || showCalendar) && (
         <div style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button onClick={() => { setSelected(null); setShowCalendar(false); }} style={{ background: "transparent", border: "none",
-            color: C.caqi, cursor: "pointer", fontSize: 13, fontFamily: "Georgia, serif",
-            fontStyle: "italic", padding: 0 }}>← back</button>
-          <span style={{ fontSize: 10, color: C.inkFaint, fontFamily: "'Courier New', monospace",
-            letterSpacing: "0.1em" }}>{dateStr}</span>
+            color: C.caqi, cursor: "pointer", fontSize: 13, fontFamily: "-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
+            fontWeight: 500, padding: 0, display: "flex", alignItems: "center", gap: 4 }}>← back</button>
+          <span style={{ fontSize: 10, color: C.inkFaint, fontFamily: "'SF Mono','Fira Code',monospace",
+            letterSpacing: "0.08em" }}>{dateStr}</span>
         </div>
       )}
 
@@ -4874,29 +4995,20 @@ export default function App() {
         {!selected && !showCalendar ? (
           <div>
             <div style={{ paddingTop: 48, paddingBottom: 8, textAlign: "center" }}>
-              <div style={{ fontSize: 11, color: C.inkFaint, fontFamily: "'Courier New', monospace",
-                letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 20 }}>{dateStr}</div>
+              <div style={{ fontSize: 11, color: C.inkFaint, fontFamily: "'SF Mono','Fira Code',monospace",
+                letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 24 }}>{dateStr}</div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 6 }}>
-                <div style={{ flex: 1, height: 1, background: `linear-gradient(to right, transparent, ${C.borderMid})` }} />
-                <div style={{ fontSize: 34, color: C.navy, fontWeight: 700, lineHeight: 1.1,
-                  letterSpacing: "-0.5px", whiteSpace: "nowrap" }}>Good {timeWord}.</div>
-                <div style={{ flex: 1, height: 1, background: `linear-gradient(to left, transparent, ${C.borderMid})` }} />
-              </div>
+              <div style={{ fontSize: 36, color: C.navy, fontWeight: 700, lineHeight: 1.1,
+                letterSpacing: "-0.8px", marginBottom: 8 }}>Good {timeWord}.</div>
 
-              <div style={{ fontSize: 19, color: C.inkLight, fontWeight: 400, fontStyle: "italic",
-                lineHeight: 1.4, marginBottom: 4 }}>Seven dimensions of a life well lived.</div>
+              <div style={{ fontSize: 15, color: C.inkLight, fontWeight: 400,
+                lineHeight: 1.5, marginBottom: 8 }}>Seven dimensions of a life well lived.</div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, marginBottom: 4 }}>
-                <div style={{ flex: 1, height: 1, background: `linear-gradient(to right, transparent, ${C.borderMid})` }} />
-                <div style={{ width: 4, height: 4, borderRadius: "50%", background: C.caqi, opacity: 0.6 }} />
-                <div style={{ width: 20, height: 1, background: C.borderMid, opacity: 0.6 }} />
-                <div style={{ width: 4, height: 4, borderRadius: "50%", background: C.caqi, opacity: 0.6 }} />
-                <div style={{ flex: 1, height: 1, background: `linear-gradient(to left, transparent, ${C.borderMid})` }} />
-              </div>
+              <div style={{ width: 32, height: 2, background: C.caqi, borderRadius: 2,
+                margin: "12px auto 12px" }} />
 
               <div style={{ fontSize: 13, color: C.inkFaint, lineHeight: 1.6,
-                maxWidth: 320, margin: "0 auto", marginTop: 12 }}>
+                maxWidth: 300, margin: "0 auto", marginTop: 8 }}>
                 Where you are full, you're thriving.<br />
                 Where you're thin, you know what to do.
               </div>
