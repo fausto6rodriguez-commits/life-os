@@ -3569,112 +3569,195 @@ Write in first person. Be concise. Plain text only.` }]
 // ── BODY DOMAIN VIEW ─────────────────────────────────────────────────────────
 // ── BODY COMPONENTS ──────────────────────────────────────────────────────────
 
-function RingGauge({ value, max=100, size=72, stroke=6, color, trackColor, label, sub, center, animate=true }) {
+// ── BODY COMPONENTS — Kandinsky-inspired ──────────────────────────────────
+
+// Stretched arc gauge: shows value vs goal as a living arc
+// The gap IS the goal — you see the stretch
+function ArcGauge({ value, goal, max, size=110, label, unit="", color, trackColor="#e8e4de", showGoalTick=true }) {
+  const stroke = 8;
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
-  const pct = Math.min(1, Math.max(0, (value||0) / max));
-  const dash = pct * circ;
+  // Arc spans 240 degrees (like Apple Watch but wider)
+  const arcSpan = 0.75; // fraction of circle
+  const pct = Math.min(1, (value||0) / (max||goal||1));
+  const goalPct = Math.min(1, (goal||0) / (max||goal||1));
+  const dashVal  = pct * arcSpan * circ;
+  const dashGoal = goalPct * arcSpan * circ;
+  const offset = circ * (1 - arcSpan) / 2;
+  const rotation = 90 + (1 - arcSpan) * 180; // start from bottom-left
+
+  // Goal tick angle
+  const goalAngle = rotation + goalPct * arcSpan * 360;
+  const goalRad = (goalAngle * Math.PI) / 180;
+  const cx = size/2, cy = size/2;
+  const tickR1 = r - stroke/2 - 2;
+  const tickR2 = r + stroke/2 + 2;
+  const tx1 = cx + tickR1 * Math.cos(goalRad);
+  const ty1 = cy + tickR1 * Math.sin(goalRad);
+  const tx2 = cx + tickR2 * Math.cos(goalRad);
+  const ty2 = cy + tickR2 * Math.sin(goalRad);
+
+  const atGoal = pct >= goalPct;
+
   return (
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
       <div style={{ position:"relative", width:size, height:size }}>
-        <svg width={size} height={size} style={{ transform:"rotate(-90deg)", display:"block" }}>
-          <circle cx={size/2} cy={size/2} r={r} fill="none"
-            stroke={trackColor||"rgba(255,255,255,0.08)"} strokeWidth={stroke}/>
-          <circle cx={size/2} cy={size/2} r={r} fill="none"
-            stroke={color} strokeWidth={stroke} strokeLinecap="round"
-            strokeDasharray={`${dash} ${circ}`}
-            style={{ transition: animate ? "stroke-dasharray 0.8s cubic-bezier(.4,0,.2,1)" : "none" }}/>
+        <svg width={size} height={size} style={{ display:"block" }}>
+          <g transform={`rotate(${rotation}, ${size/2}, ${size/2})`}>
+            {/* Track */}
+            <circle cx={size/2} cy={size/2} r={r} fill="none"
+              stroke={trackColor} strokeWidth={stroke} strokeLinecap="round"
+              strokeDasharray={`${arcSpan*circ} ${circ}`}
+              strokeDashoffset={-offset}/>
+            {/* Goal track (dimmer, shows what you're reaching for) */}
+            <circle cx={size/2} cy={size/2} r={r} fill="none"
+              stroke={color} strokeWidth={stroke} strokeLinecap="round"
+              opacity="0.12"
+              strokeDasharray={`${dashGoal} ${circ}`}
+              strokeDashoffset={-offset}/>
+            {/* Value arc */}
+            <circle cx={size/2} cy={size/2} r={r} fill="none"
+              stroke={color} strokeWidth={stroke} strokeLinecap="round"
+              strokeDasharray={`${dashVal} ${circ}`}
+              strokeDashoffset={-offset}
+              style={{ transition:"stroke-dasharray 0.9s cubic-bezier(.4,0,.2,1)" }}/>
+          </g>
+          {/* Goal tick mark */}
+          {showGoalTick && goal && (
+            <line x1={tx1} y1={ty1} x2={tx2} y2={ty2}
+              stroke={color} strokeWidth={2} opacity="0.5"/>
+          )}
+          {/* Center content */}
+          <text x={size/2} y={size/2 - 6} textAnchor="middle"
+            style={{ fontSize:22, fontWeight:800, fill: atGoal ? color : "#1a1612", fontFamily:"system-ui" }}>
+            {value!=null ? (typeof value==="number" && value%1!==0 ? value.toFixed(1) : value) : "—"}
+          </text>
+          <text x={size/2} y={size/2 + 10} textAnchor="middle"
+            style={{ fontSize:10, fill:"#9a8f82", fontFamily:"system-ui", fontWeight:500 }}>{unit}</text>
+          {goal && <text x={size/2} y={size/2 + 24} textAnchor="middle"
+            style={{ fontSize:9, fill: atGoal ? color : "#bdb0a3", fontFamily:"system-ui" }}>
+            {atGoal ? "✓ goal" : `goal: ${goal}${unit}`}
+          </text>}
         </svg>
-        <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column",
-          alignItems:"center", justifyContent:"center", gap:1 }}>
-          {center}
-        </div>
       </div>
-      {label && <div style={{ fontSize:9, color:"rgba(255,255,255,0.45)", letterSpacing:"0.1em",
-        textTransform:"uppercase", fontWeight:600, textAlign:"center" }}>{label}</div>}
-      {sub && <div style={{ fontSize:11, color:"rgba(255,255,255,0.7)", textAlign:"center",
-        fontWeight:500, marginTop:-2 }}>{sub}</div>}
+      {label && <div style={{ fontSize:10, color:"#9a8f82", letterSpacing:"0.08em",
+        textTransform:"uppercase", fontWeight:700, textAlign:"center" }}>{label}</div>}
     </div>
   );
 }
 
-function MiniSparkLine({ data, color, height=32 }) {
-  if (!data || data.length < 2) return <div style={{ height }} />;
-  const valid = data.map(v => v||0);
-  const max = Math.max(...valid, 1);
-  const min = Math.min(...valid);
+// Thin sparkline for trend — Kandinsky-style: line as gesture, not decoration
+function TrendLine({ data, color, height=36, goalLine }) {
+  if (!data || data.length < 2) return <div style={{ height }}/>;
+  const vals = data.map(v=>v||0);
+  const max = Math.max(...vals, goalLine||0, 1);
+  const min = Math.min(...vals, 0);
   const range = max - min || 1;
   const w = 100, h = height;
-  const pts = valid.map((v,i) => {
-    const x = (i/(valid.length-1))*w;
-    const y = h - ((v-min)/range)*(h-4) - 2;
-    return `${x},${y}`;
-  }).join(" ");
-  const area = `M0,${h} L${pts.split(" ").map(p=>`L${p}`).join(" ").slice(1)} L${w},${h} Z`;
+  const pts = vals.map((v,i) => {
+    const x = (i/(vals.length-1))*w;
+    const y = h - ((v-min)/range)*(h-6) - 3;
+    return [x,y];
+  });
+  const polyPts = pts.map(p=>p.join(",")).join(" ");
+  const areaPath = `M${pts[0][0]},${h} ${pts.map(p=>`L${p[0]},${p[1]}`).join(" ")} L${pts[pts.length-1][0]},${h} Z`;
+  const goalY = goalLine!=null ? h - ((goalLine-min)/range)*(h-6) - 3 : null;
+
   return (
     <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none"
       style={{ width:"100%", height, display:"block" }}>
       <defs>
-        <linearGradient id={`sg_${color.replace(/[^a-z0-9]/gi,"")}`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35"/>
-          <stop offset="100%" stopColor={color} stopOpacity="0.03"/>
+        <linearGradient id={`tl_${color.replace(/[^a-z0-9]/gi,"")}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.18"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0"/>
         </linearGradient>
       </defs>
-      <path d={area} fill={`url(#sg_${color.replace(/[^a-z0-9]/gi,"")})`}/>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      {/* Last point dot */}
-      {(() => {
-        const last = pts.split(" ").pop().split(",");
-        return <circle cx={last[0]} cy={last[1]} r="2.5" fill={color}/>;
-      })()}
+      <path d={areaPath} fill={`url(#tl_${color.replace(/[^a-z0-9]/gi,"")})`}/>
+      {goalY!=null && (
+        <line x1="0" y1={goalY} x2={w} y2={goalY}
+          stroke={color} strokeWidth="0.8" strokeDasharray="3,2" opacity="0.45"/>
+      )}
+      <polyline points={polyPts} fill="none" stroke={color} strokeWidth="1.8"
+        strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx={pts[pts.length-1][0]} cy={pts[pts.length-1][1]} r="2.5" fill={color}/>
     </svg>
   );
 }
 
-function TrendBadge({ current, previous, unit="", higherIsBetter=true }) {
-  if (current == null || previous == null) return null;
+function TrendPill({ current, previous, higherIsBetter=true, unit="" }) {
+  if (current==null||previous==null||previous===0) return null;
   const diff = current - previous;
-  const pct = previous !== 0 ? Math.abs(diff/previous*100) : 0;
   const up = diff > 0;
   const good = higherIsBetter ? up : !up;
-  if (Math.abs(diff) < 0.01) return (
-    <span style={{ fontSize:10, color:"rgba(255,255,255,0.35)", fontWeight:500 }}>→ no change</span>
-  );
+  const absDiff = Math.abs(diff);
+  const fmt = absDiff < 1 ? absDiff.toFixed(1) : Math.round(absDiff);
+  if (absDiff < 0.05) return <span style={{ fontSize:10, color:"#bdb0a3" }}>≈ same</span>;
   return (
-    <span style={{ fontSize:10, color: good ? "#30d158" : "#ff453a", fontWeight:600,
-      display:"inline-flex", alignItems:"center", gap:2 }}>
-      {up ? "↑" : "↓"} {pct < 10 ? Math.abs(diff).toFixed(1)+unit : Math.round(pct)+"%"}
+    <span style={{ fontSize:10, fontWeight:700, color: good ? "#4a9e6a" : "#c25a3a",
+      background: good ? "#f0faf4" : "#fdf3f0",
+      padding:"2px 7px", borderRadius:20, display:"inline-flex", alignItems:"center", gap:3 }}>
+      {up?"↑":"↓"} {fmt}{unit}
     </span>
   );
 }
 
-// Dark card with subtle border
-const DC = {
-  card:    "#1c1c1e",
-  card2:   "#2c2c2e",
-  card3:   "#3a3a3c",
-  text:    "#ffffff",
-  text2:   "rgba(255,255,255,0.7)",
-  text3:   "rgba(255,255,255,0.4)",
-  green:   "#30d158",
-  blue:    "#0a84ff",
-  purple:  "#bf5af2",
-  orange:  "#ff9f0a",
-  red:     "#ff453a",
-  teal:    "#5ac8fa",
-  bg:      "#000000",
-};
+// Goal editor — inline, lightweight
+function GoalEditor({ goals, onChange, fields }) {
+  const [open, setOpen] = useState(false);
+  const [vals, setVals] = useState(goals || {});
+  if (!open) return (
+    <button onClick={()=>setOpen(true)}
+      style={{ background:"transparent", border:"1px dashed #d4cdc5", borderRadius:6,
+        color:"#b0a496", fontSize:11, padding:"4px 10px", cursor:"pointer", fontWeight:500 }}>
+      ✎ set goals
+    </button>
+  );
+  return (
+    <div style={{ background:"#fff", border:"1px solid #e8e2db", borderRadius:10,
+      padding:"14px", marginBottom:12 }}>
+      <div style={{ fontSize:10, color:"#9a8f82", textTransform:"uppercase", letterSpacing:"0.08em",
+        fontWeight:700, marginBottom:10 }}>Personal goals</div>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:10 }}>
+        {fields.map(f=>(
+          <div key={f.id} style={{ flex:"1 1 120px" }}>
+            <div style={{ fontSize:10, color:"#9a8f82", marginBottom:3 }}>{f.label}</div>
+            <input type="number" value={vals[f.id]||""} onChange={e=>setVals({...vals,[f.id]:Number(e.target.value)})}
+              style={{ width:"100%", background:"#f7f4f0", border:"1px solid #e8e2db", borderRadius:6,
+                padding:"5px 8px", fontSize:13, color:"#1a1612", outline:"none", boxSizing:"border-box" }}/>
+          </div>
+        ))}
+      </div>
+      <div style={{ display:"flex", gap:8, marginTop:10 }}>
+        <button onClick={()=>{ onChange(vals); setOpen(false); }}
+          style={{ background:"#1a1612", border:"none", borderRadius:6, color:"#fff",
+            fontSize:11, padding:"5px 14px", cursor:"pointer", fontWeight:600 }}>Save</button>
+        <button onClick={()=>setOpen(false)}
+          style={{ background:"transparent", border:"none", color:"#9a8f82", fontSize:11, cursor:"pointer" }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
 
 function BodyDomainView({ domain, onUpdate, onBack }) {
-  const [daily, setDaily]       = useState([]);
-  const [activities, setActs]   = useState([]);
-  const [meals, setMeals]       = useState(domain.meals || []);
-  const [loading, setLoading]   = useState(true);
-  const [tab, setTab]           = useState("exercise");
+  const [daily, setDaily]     = useState([]);
+  const [activities, setActs] = useState([]);
+  const [meals, setMeals]     = useState(domain.meals || []);
+  const [goals, setGoals]     = useState(domain.bodyGoals || {
+    weeklyKm: 40, weeklyRuns: 4, avgSleepHrs: 7.5, sleepScore: 75,
+    weeklyStrength: 2, stressTarget: 30, restingHRTarget: 55, dailySteps: 10000,
+    dailyCal: 2200, dailyProtein: 140,
+  });
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab]         = useState("exercise");
   const [lastSync, setLastSync] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [mealNote, setMealNote]   = useState("");
+  const [mealNote, setMealNote] = useState("");
   const foodInputRef = useRef(null);
+
+  const saveGoals = (g) => {
+    setGoals(g);
+    onUpdate({ ...domain, bodyGoals: g });
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -3702,49 +3785,63 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
   const strength = activities.filter(a=>a.activity_type==="strength_training");
   const allEx    = activities.filter(a=>!["meditation"].includes(a.activity_type));
 
-  // Streak
   const actDates = new Set(activities.map(a=>a.date));
   let streak = 0;
-  for (let i=0; i<30; i++) {
-    const d = new Date(); d.setDate(d.getDate()-i);
-    const ds = d.toISOString().split("T")[0];
-    if (actDates.has(ds)) streak++;
-    else if (i>0) break;
+  for (let i=0;i<30;i++) {
+    const d=new Date(); d.setDate(d.getDate()-i);
+    const ds=d.toISOString().split("T")[0];
+    if(actDates.has(ds)) streak++;
+    else if(i>0) break;
   }
 
-  const cutoff7 = new Date(); cutoff7.setDate(cutoff7.getDate()-7);
+  const cutoff7  = new Date(); cutoff7.setDate(cutoff7.getDate()-7);
   const cutoff14 = new Date(); cutoff14.setDate(cutoff14.getDate()-14);
   const week7Acts  = allEx.filter(a=>new Date(a.date)>=cutoff7);
-  const week14Acts = allEx.filter(a=>new Date(a.date)>=cutoff14 && new Date(a.date)<cutoff7);
-  const avgDur  = week7Acts.length ? Math.round(week7Acts.reduce((s,a)=>s+(a.duration_seconds||0),0)/week7Acts.length/60) : null;
-  const avgDur2 = week14Acts.length ? Math.round(week14Acts.reduce((s,a)=>s+(a.duration_seconds||0),0)/week14Acts.length/60) : null;
-
+  const week14Acts = allEx.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7);
   const weekRunKm  = runs.filter(a=>new Date(a.date)>=cutoff7).reduce((s,a)=>s+((a.distance_meters||0)/1000),0);
   const weekRunKm2 = runs.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7).reduce((s,a)=>s+((a.distance_meters||0)/1000),0);
-
+  const weekRuns   = runs.filter(a=>new Date(a.date)>=cutoff7).length;
+  const weekRuns2  = runs.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7).length;
+  const avgDur     = week7Acts.length ? Math.round(week7Acts.reduce((s,a)=>s+(a.duration_seconds||0),0)/week7Acts.length/60) : null;
   const avgRunHRArr = runs.filter(r=>r.avg_hr).slice(0,10);
   const avgRunHR = avgRunHRArr.length ? Math.round(avgRunHRArr.reduce((s,r)=>s+r.avg_hr,0)/avgRunHRArr.length) : null;
   const bestPace = runs.filter(r=>r.avg_pace_min_per_km).sort((a,b)=>a.avg_pace_min_per_km-b.avg_pace_min_per_km)[0];
+  const weekStr    = strength.filter(a=>new Date(a.date)>=cutoff7).length;
+  const weekStr2   = strength.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7).length;
 
   const avgStress7  = week7.filter(d=>d.stress_avg).length ? Math.round(week7.filter(d=>d.stress_avg).reduce((s,d)=>s+d.stress_avg,0)/week7.filter(d=>d.stress_avg).length) : null;
   const avgStress14 = daily.slice(7,14).filter(d=>d.stress_avg).length ? Math.round(daily.slice(7,14).filter(d=>d.stress_avg).reduce((s,d)=>s+d.stress_avg,0)/daily.slice(7,14).filter(d=>d.stress_avg).length) : null;
   const avgRHR7  = week7.filter(d=>d.resting_hr).length ? Math.round(week7.filter(d=>d.resting_hr).reduce((s,d)=>s+d.resting_hr,0)/week7.filter(d=>d.resting_hr).length) : null;
   const avgRHR14 = daily.slice(7,14).filter(d=>d.resting_hr).length ? Math.round(daily.slice(7,14).filter(d=>d.resting_hr).reduce((s,d)=>s+d.resting_hr,0)/daily.slice(7,14).filter(d=>d.resting_hr).length) : null;
 
-  // Sleep
-  const sleepDays = daily.filter(d=>d.sleep_hrs);
-  const lastSleep = sleepDays[0];
-  const prevSleep = sleepDays[1];
-  const avg7sleep = sleepDays.slice(0,7).length ? sleepDays.slice(0,7).reduce((s,d)=>s+d.sleep_hrs,0)/sleepDays.slice(0,7).length : null;
-  const avg14sleep = sleepDays.slice(7,14).length ? sleepDays.slice(7,14).reduce((s,d)=>s+d.sleep_hrs,0)/sleepDays.slice(7,14).length : null;
-  const avgScore7 = sleepDays.filter(d=>d.sleep_score).slice(0,7);
+  const sleepDays   = daily.filter(d=>d.sleep_hrs);
+  const lastSleep   = sleepDays[0];
+  const prevSleep   = sleepDays[1];
+  const avg7sleep   = sleepDays.slice(0,7).length ? +(sleepDays.slice(0,7).reduce((s,d)=>s+d.sleep_hrs,0)/sleepDays.slice(0,7).length).toFixed(1) : null;
+  const avg14sleep  = sleepDays.slice(7,14).length ? +(sleepDays.slice(7,14).reduce((s,d)=>s+d.sleep_hrs,0)/sleepDays.slice(7,14).length).toFixed(1) : null;
+  const avgScore7   = sleepDays.filter(d=>d.sleep_score).slice(0,7);
   const avgSleepScore = avgScore7.length ? Math.round(avgScore7.reduce((s,d)=>s+d.sleep_score,0)/avgScore7.length) : null;
+  const prevAvgScore  = sleepDays.filter(d=>d.sleep_score).slice(7,14);
+  const prevSleepScore = prevAvgScore.length ? Math.round(prevAvgScore.reduce((s,d)=>s+d.sleep_score,0)/prevAvgScore.length) : null;
 
   const formatDur = s => { if(!s)return"—"; const m=Math.round(s/60); return m>=60?`${Math.floor(m/60)}h${m%60?m%60+"m":""}`:m+"m"; };
   const actIcon = t => ({running:"🏃",strength_training:"💪",cycling:"🚴",swimming:"🏊",meditation:"🧘",walking:"🚶",yoga:"🧘",hiking:"🥾"}[t]||"⚡");
-  const scoreCol = (v,lo,hi) => v==null?DC.text3:v>=hi?DC.green:v>=lo?DC.orange:DC.red;
 
-  // Food logging
+  // Kandinsky palette — primary, deliberate
+  const K = {
+    bg:      "#f5f2ed",
+    surface: "#ffffff",
+    warm:    "#f0ebe3",
+    red:     "#c0392b",
+    blue:    "#2563a8",
+    yellow:  "#d4960a",
+    teal:    "#1a7a6e",
+    ink:     "#1a1612",
+    inkMid:  "#4a3f35",
+    inkFaint:"#9a8f82",
+    border:  "#e4ddd4",
+  };
+
   const analyzeFood = async (file) => {
     setAnalyzing(true);
     try {
@@ -3754,14 +3851,14 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
         body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:500,
           messages:[{ role:"user", content:[
             { type:"image", source:{ type:"base64", media_type:file.type||"image/jpeg", data:base64 }},
-            { type:"text", text:`Analyze this food image. Return ONLY JSON (no markdown):
-{"name":"meal name","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"notes":"brief description"}` }
+            { type:"text", text:`Analyze this food. Return ONLY JSON (no markdown, no explanation):
+{"name":"meal name","calories":number,"protein_g":number,"carbs_g":number,"fat_g":number,"notes":"brief"}` }
           ]}]})
       });
       const data = await resp.json();
       const text = data.content?.find(b=>b.type==="text")?.text||"{}";
       const meal = JSON.parse(text.replace(/```json|```/g,"").trim());
-      const newMeal = { ...meal, id:`meal${Date.now()}`, date:new Date().toISOString().split("T")[0], time:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}), note:mealNote };
+      const newMeal = {...meal, id:`meal${Date.now()}`, date:new Date().toISOString().split("T")[0], time:new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"}), note:mealNote};
       const updated = [newMeal,...(domain.meals||[])];
       setMeals(updated);
       onUpdate({...domain, meals:updated});
@@ -3771,172 +3868,160 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
   };
 
   const todayMeals = meals.filter(m=>m.date===new Date().toISOString().split("T")[0]);
-  const totalCal = todayMeals.reduce((s,m)=>s+(m.calories||0),0);
-  const totalPro = todayMeals.reduce((s,m)=>s+(m.protein_g||0),0);
+  const totalCal  = todayMeals.reduce((s,m)=>s+(m.calories||0),0);
+  const totalPro  = todayMeals.reduce((s,m)=>s+(m.protein_g||0),0);
   const totalCarb = todayMeals.reduce((s,m)=>s+(m.carbs_g||0),0);
-  const totalFat = todayMeals.reduce((s,m)=>s+(m.fat_g||0),0);
+  const totalFat  = todayMeals.reduce((s,m)=>s+(m.fat_g||0),0);
 
-  // Tab config
   const TABS = [{id:"exercise",label:"Move"},{id:"sleep",label:"Sleep"},{id:"health",label:"Health"},{id:"nutrition",label:"Fuel"}];
 
-  const wrapStyle = { background:DC.bg, minHeight:"100%", padding:"0 0 40px" };
-  const cardStyle = { background:DC.card, borderRadius:16, padding:"16px", marginBottom:12 };
-  const card2Style = { background:DC.card2, borderRadius:12, padding:"14px", marginBottom:10 };
-  const labelStyle = { fontSize:10, color:DC.text3, letterSpacing:"0.08em", textTransform:"uppercase", fontWeight:600, marginBottom:6 };
-  const bigNumStyle = { fontSize:28, fontWeight:700, color:DC.text, lineHeight:1, letterSpacing:"-0.5px" };
-  const unitStyle = { fontSize:13, color:DC.text2, fontWeight:500, marginLeft:3 };
+  const sectionLabel = { fontSize:10, color:K.inkFaint, textTransform:"uppercase",
+    letterSpacing:"0.1em", fontWeight:700, marginBottom:8 };
+  const card = { background:K.surface, borderRadius:14, padding:"16px",
+    marginBottom:12, border:`1px solid ${K.border}`,
+    boxShadow:"0 1px 4px rgba(26,22,18,0.06)" };
 
   return (
-    <div style={wrapStyle}>
+    <div style={{ background:K.bg, minHeight:"100%" }}>
       {/* Header */}
-      <div style={{ padding:"20px 20px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <span style={{ fontSize:20, color:domain.color }}>{domain.glyph}</span>
-          <span style={{ fontSize:22, fontWeight:700, color:DC.text, letterSpacing:"-0.4px" }}>Body</span>
+      <div style={{ padding:"16px 20px 10px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <div style={{ width:4, height:24, borderRadius:2, background:domain.color }}/>
+          <span style={{ fontSize:21, fontWeight:700, color:K.ink, letterSpacing:"-0.4px" }}>Body</span>
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-          {lastSync && <span style={{ fontSize:11, color:DC.text3 }}>{lastSync}</span>}
+          {lastSync && <span style={{ fontSize:11, color:K.inkFaint }}>{lastSync}</span>}
           <button onClick={loadData} disabled={loading}
-            style={{ background:DC.card2, border:"none", borderRadius:8, color:DC.text2,
-              fontSize:13, padding:"6px 12px", cursor:loading?"default":"pointer", fontWeight:500 }}>
-            {loading ? "…" : "↻"}
+            style={{ background:K.warm, border:`1px solid ${K.border}`, borderRadius:8,
+              color:K.inkMid, fontSize:12, padding:"5px 11px", cursor:loading?"default":"pointer", fontWeight:500 }}>
+            {loading?"…":"↻"}
           </button>
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div style={{ display:"flex", gap:6, padding:"0 20px 16px" }}>
+      {/* Tabs — pill style, warm */}
+      <div style={{ display:"flex", gap:4, padding:"0 16px 14px" }}>
         {TABS.map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
-            style={{ flex:1, border:"none", borderRadius:10,
-              background: tab===t.id ? domain.color : DC.card2,
-              color: tab===t.id ? "#fff" : DC.text3,
-              padding:"9px 4px", fontSize:12, cursor:"pointer",
-              fontWeight: tab===t.id ? 700 : 500,
-              letterSpacing:"0.01em",
-              transition:"all 0.15s ease" }}>
+            style={{ flex:1, border:"none", borderRadius:8,
+              background: tab===t.id ? K.ink : K.warm,
+              color: tab===t.id ? "#fff" : K.inkFaint,
+              padding:"8px 3px", fontSize:11, cursor:"pointer",
+              fontWeight: tab===t.id ? 700 : 500, transition:"all 0.15s" }}>
             {t.label}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <div style={{ textAlign:"center", padding:"60px 0", color:DC.text3, fontSize:13 }}>Loading…</div>
+        <div style={{ textAlign:"center", padding:"60px 0", color:K.inkFaint, fontSize:13 }}>Loading…</div>
       ) : daily.length===0 ? (
         <div style={{ textAlign:"center", padding:"60px 20px" }}>
-          <div style={{ fontSize:13, color:DC.text3, marginBottom:8 }}>No data yet</div>
-          <div style={{ fontSize:11, color:DC.text3, fontFamily:"'SF Mono',monospace" }}>
-            Run: python3 ~/garmin_sync.py
-          </div>
+          <div style={{ fontSize:13, color:K.inkFaint }}>No data yet — run python3 ~/garmin_sync.py</div>
         </div>
       ) : (
-      <div style={{ padding:"0 16px" }}>
+      <div style={{ padding:"0 14px" }}>
+
+      {/* ── MOVE ─────────────────────────────────────────────────────────── */}
       {tab==="exercise" && (
         <>
-          {/* Top metrics grid */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
-            {/* Streak */}
-            <div style={{ ...cardStyle, marginBottom:0, background: streak>0 ? `linear-gradient(135deg, #1c3a2a, #0a2018)` : DC.card,
-              border: streak>0 ? `1px solid ${DC.green}33` : "none" }}>
-              <div style={labelStyle}>Streak</div>
-              <div style={{ display:"flex", alignItems:"baseline", gap:4 }}>
-                <span style={{ ...bigNumStyle, color: streak>0 ? DC.green : DC.text }}>{streak}</span>
-                <span style={{ ...unitStyle, color:DC.text3 }}>days</span>
-              </div>
-              <div style={{ fontSize:11, color:DC.text3, marginTop:4 }}>
-                {streak>0 ? "🔥 keep it up" : "Start today"}
-              </div>
-            </div>
+          <GoalEditor goals={goals} onChange={saveGoals} fields={[
+            {id:"weeklyKm",label:"Weekly km goal"},{id:"weeklyRuns",label:"Runs/week"},
+            {id:"weeklyStrength",label:"Strength/week"},{id:"dailySteps",label:"Daily steps"},
+          ]}/>
 
-            {/* This week */}
-            <div style={{ ...cardStyle, marginBottom:0, background:`linear-gradient(135deg, #1a2535, #0d1829)`,
-              border:`1px solid ${DC.blue}33` }}>
-              <div style={labelStyle}>This week</div>
-              <div style={{ display:"flex", alignItems:"baseline", gap:4 }}>
-                <span style={{ ...bigNumStyle, color:DC.blue }}>{week7Acts.length}</span>
-                <span style={{ ...unitStyle, color:DC.text3 }}>/ 7</span>
+          {/* Arc gauges — weekly km vs goal is the hero */}
+          <div style={{ ...card }}>
+            <div style={{ display:"flex", justifyContent:"space-around", paddingBottom:8 }}>
+              <ArcGauge value={+weekRunKm.toFixed(1)} goal={goals.weeklyKm} max={goals.weeklyKm*1.5}
+                size={116} color={K.blue} unit="km" label="Weekly km"/>
+              <ArcGauge value={weekRuns} goal={goals.weeklyRuns} max={7}
+                size={116} color={K.teal} unit="" label="Runs"/>
+              <ArcGauge value={weekStr} goal={goals.weeklyStrength} max={7}
+                size={116} color={K.yellow} unit="" label="Strength"/>
+            </div>
+            {/* Trend row */}
+            <div style={{ display:"flex", justifyContent:"space-around", paddingTop:8,
+              borderTop:`1px solid ${K.border}`, marginTop:4 }}>
+              <div style={{ textAlign:"center" }}>
+                <div style={{ fontSize:9, color:K.inkFaint, marginBottom:3 }}>vs last week</div>
+                <TrendPill current={weekRunKm} previous={weekRunKm2} unit="km" higherIsBetter={true}/>
               </div>
-              <div style={{ fontSize:11, color:DC.text3, marginTop:4, display:"flex", gap:6 }}>
-                {avgDur && <span>{avgDur}m avg</span>}
-                <TrendBadge current={week7Acts.length} previous={week14Acts.length} higherIsBetter={true}/>
+              <div style={{ textAlign:"center" }}>
+                <div style={{ fontSize:9, color:K.inkFaint, marginBottom:3 }}>runs</div>
+                <TrendPill current={weekRuns} previous={weekRuns2} higherIsBetter={true}/>
+              </div>
+              <div style={{ textAlign:"center" }}>
+                <div style={{ fontSize:9, color:K.inkFaint, marginBottom:3 }}>strength</div>
+                <TrendPill current={weekStr} previous={weekStr2} higherIsBetter={true}/>
               </div>
             </div>
           </div>
 
-          {/* Run stats card */}
-          {runs.length > 0 && (
-            <div style={{ ...cardStyle }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-                <div style={labelStyle}>Running</div>
-                <div style={{ display:"flex", gap:12 }}>
-                  {bestPace && <span style={{ fontSize:11, color:DC.green, fontWeight:600 }}>🏅 {bestPace.avg_pace_min_per_km.toFixed(2)} /km</span>}
-                  {avgRunHR && <span style={{ fontSize:11, color:DC.text3 }}>♡ {avgRunHR}bpm avg</span>}
-                </div>
+          {/* Streak + stats strip */}
+          <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+            <div style={{ flex:1, background:streak>0?`#f0f7f4`:`#faf9f7`, borderRadius:12,
+              padding:"12px 14px", border:`1px solid ${streak>0?"#b8ddd0":K.border}` }}>
+              <div style={{ fontSize:9, color:K.inkFaint, textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700 }}>Streak</div>
+              <div style={{ fontSize:28, fontWeight:800, color:streak>0?K.teal:K.inkFaint, lineHeight:1.1 }}>
+                {streak}<span style={{ fontSize:13, color:K.inkFaint, marginLeft:3 }}>d</span>
               </div>
-
-              {/* Km this week hero */}
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:12 }}>
-                <div>
-                  <div style={{ ...bigNumStyle, fontSize:36, color:domain.color }}>
-                    {weekRunKm.toFixed(1)}<span style={{ fontSize:18, color:DC.text2, marginLeft:4 }}>km</span>
-                  </div>
-                  <div style={{ fontSize:12, color:DC.text3, marginTop:2, display:"flex", gap:8, alignItems:"center" }}>
-                    this week
-                    <TrendBadge current={weekRunKm} previous={weekRunKm2} unit="km" higherIsBetter={true}/>
-                  </div>
-                </div>
-                <div style={{ textAlign:"right" }}>
-                  <div style={{ fontSize:22, fontWeight:700, color:DC.text }}>{runs.slice(0,4).length}</div>
-                  <div style={{ fontSize:11, color:DC.text3 }}>runs</div>
-                </div>
+            </div>
+            <div style={{ flex:1, background:"#fafaf7", borderRadius:12, padding:"12px 14px", border:`1px solid ${K.border}` }}>
+              <div style={{ fontSize:9, color:K.inkFaint, textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700 }}>Avg session</div>
+              <div style={{ fontSize:28, fontWeight:800, color:K.ink, lineHeight:1.1 }}>
+                {avgDur||"—"}<span style={{ fontSize:13, color:K.inkFaint, marginLeft:3 }}>min</span>
               </div>
+            </div>
+            {bestPace && (
+              <div style={{ flex:1, background:"#f7f9fa", borderRadius:12, padding:"12px 14px", border:`1px solid ${K.border}` }}>
+                <div style={{ fontSize:9, color:K.inkFaint, textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700 }}>Best pace</div>
+                <div style={{ fontSize:22, fontWeight:800, color:K.blue, lineHeight:1.1 }}>
+                  {bestPace.avg_pace_min_per_km.toFixed(2)}
+                </div>
+                <div style={{ fontSize:9, color:K.inkFaint }}>min/km</div>
+              </div>
+            )}
+          </div>
 
-              {/* Sparkline */}
-              <MiniSparkLine data={[...runs.slice(0,10)].reverse().map(r=>(r.distance_meters||0)/1000)}
-                color={domain.color} height={44}/>
+          {/* Run km trend */}
+          {runs.length>2 && (
+            <div style={card}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                <div style={sectionLabel}>Distance per run</div>
+                {avgRunHR && <span style={{ fontSize:11, color:K.inkFaint }}>♡ {avgRunHR} bpm avg</span>}
+              </div>
+              <TrendLine data={[...runs.slice(0,10)].reverse().map(r=>(r.distance_meters||0)/1000)}
+                color={K.blue} height={48} goalLine={goals.weeklyKm/Math.max(goals.weeklyRuns,1)}/>
               <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
-                <span style={{ fontSize:9, color:DC.text3 }}>{runs[Math.min(9,runs.length-1)]?.date?.slice(5)}</span>
-                <span style={{ fontSize:9, color:DC.text3 }}>{runs[0]?.date?.slice(5)}</span>
+                <span style={{ fontSize:9, color:K.inkFaint }}>{runs[Math.min(9,runs.length-1)]?.date?.slice(5)}</span>
+                <span style={{ fontSize:9, color:K.inkFaint }}>{runs[0]?.date?.slice(5)}</span>
               </div>
             </div>
           )}
 
-          {/* Strength card */}
-          {strength.length > 0 && (
-            <div style={{ ...cardStyle }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-                <div style={labelStyle}>Strength</div>
-                <span style={{ fontSize:11, color:DC.text3 }}>{strength.length} sessions · {formatDur(strength.reduce((s,a)=>s+(a.duration_seconds||0),0)/strength.length)} avg</span>
-              </div>
-              <MiniSparkLine data={[...strength.slice(0,8)].reverse().map(a=>(a.duration_seconds||0)/60)}
-                color="#ff9f0a" height={32}/>
-            </div>
-          )}
-
-          {/* Recent activity list */}
-          <div style={{ ...cardStyle }}>
-            <div style={{ ...labelStyle, marginBottom:12 }}>Recent</div>
-            {allEx.slice(0,8).map((a,i) => (
-              <div key={i} style={{ display:"flex", alignItems:"center", gap:12,
-                padding:"10px 0", borderBottom: i<7?`1px solid rgba(255,255,255,0.06)`:"none" }}>
-                <div style={{ width:38, height:38, borderRadius:10, background:DC.card2,
-                  display:"flex", alignItems:"center", justifyContent:"center", fontSize:18, flexShrink:0 }}>
+          {/* Activity log */}
+          <div style={card}>
+            <div style={{ ...sectionLabel, marginBottom:10 }}>Recent</div>
+            {allEx.slice(0,8).map((a,i)=>(
+              <div key={i} style={{ display:"flex", alignItems:"center", gap:10,
+                padding:"9px 0", borderBottom:i<7?`1px solid ${K.border}`:"none" }}>
+                <div style={{ width:36, height:36, borderRadius:9, background:K.warm,
+                  display:"flex", alignItems:"center", justifyContent:"center", fontSize:17, flexShrink:0 }}>
                   {actIcon(a.activity_type)}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:DC.text,
+                  <div style={{ fontSize:13, fontWeight:600, color:K.ink,
                     overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                     {a.name||a.activity_type?.replace(/_/g," ")}
                   </div>
-                  <div style={{ fontSize:11, color:DC.text3, marginTop:2 }}>
-                    {a.date?.slice(5)}
-                    {a.avg_hr ? ` · ${Math.round(a.avg_hr)} bpm` : ""}
-                    {a.avg_pace_min_per_km ? ` · ${a.avg_pace_min_per_km.toFixed(2)}/km` : ""}
+                  <div style={{ fontSize:10, color:K.inkFaint, marginTop:1 }}>
+                    {a.date?.slice(5)}{a.avg_hr?` · ${Math.round(a.avg_hr)}bpm`:""}{a.avg_pace_min_per_km?` · ${a.avg_pace_min_per_km.toFixed(2)}/km`:""}
                   </div>
                 </div>
                 <div style={{ textAlign:"right", flexShrink:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:DC.text }}>{formatDur(a.duration_seconds)}</div>
-                  {a.distance_meters>100 && <div style={{ fontSize:11, color:DC.text3 }}>{(a.distance_meters/1000).toFixed(1)}km</div>}
+                  <div style={{ fontSize:13, fontWeight:600, color:K.ink }}>{formatDur(a.duration_seconds)}</div>
+                  {a.distance_meters>100&&<div style={{ fontSize:10, color:K.inkFaint }}>{(a.distance_meters/1000).toFixed(1)}km</div>}
                 </div>
               </div>
             ))}
@@ -3944,68 +4029,82 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
         </>
       )}
 
+      {/* ── SLEEP ────────────────────────────────────────────────────────── */}
       {tab==="sleep" && (
         <>
+          <GoalEditor goals={goals} onChange={saveGoals} fields={[
+            {id:"avgSleepHrs",label:"Sleep target (hrs)"},{id:"sleepScore",label:"Score target"},
+          ]}/>
+
           {!lastSleep ? (
-            <div style={{ textAlign:"center", padding:"60px 0", color:DC.text3, fontSize:13 }}>
+            <div style={{ textAlign:"center", padding:"40px 0", color:K.inkFaint, fontSize:13 }}>
               No sleep data — sync after wearing your watch overnight
             </div>
           ) : (
             <>
-              {/* Hero card */}
-              <div style={{ ...cardStyle, background:"linear-gradient(135deg, #1a1a2e, #16213e)",
-                border:`1px solid ${DC.purple}33` }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20 }}>
+              {/* Hero card — score + arcs */}
+              <div style={{ ...card, background:"#fafaf8" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:16 }}>
                   <div>
-                    <div style={{ ...labelStyle, color:DC.purple }}>Last night · {lastSleep.date}</div>
+                    <div style={{ fontSize:9, color:K.inkFaint, textTransform:"uppercase", letterSpacing:"0.1em", fontWeight:700, marginBottom:4 }}>
+                      Last night · {lastSleep.date}
+                    </div>
                     {lastSleep.sleep_feedback && (
-                      <div style={{ fontSize:12, color:"rgba(191,90,242,0.8)", marginTop:4, maxWidth:200, lineHeight:1.3 }}>
+                      <div style={{ fontSize:12, color:K.inkMid, lineHeight:1.4, maxWidth:180 }}>
                         {lastSleep.sleep_feedback.replace(/_/g," ").toLowerCase()}
                       </div>
                     )}
                   </div>
-                  {lastSleep.sleep_score && (
+                  {lastSleep.sleep_score!=null && (
                     <div style={{ textAlign:"center" }}>
-                      <div style={{ fontSize:42, fontWeight:800, color:scoreCol(lastSleep.sleep_score,60,80),
-                        lineHeight:1, letterSpacing:"-1px" }}>{lastSleep.sleep_score}</div>
-                      <div style={{ fontSize:10, color:DC.text3, marginTop:2 }}>sleep score</div>
-                      {prevSleep?.sleep_score && (
-                        <div style={{ marginTop:4 }}>
-                          <TrendBadge current={lastSleep.sleep_score} previous={prevSleep.sleep_score} higherIsBetter={true}/>
-                        </div>
-                      )}
+                      <div style={{ fontSize:44, fontWeight:800, color:lastSleep.sleep_score>=75?K.teal:lastSleep.sleep_score>=60?K.yellow:K.red, lineHeight:1, letterSpacing:"-1px" }}>
+                        {lastSleep.sleep_score}
+                      </div>
+                      <div style={{ fontSize:9, color:K.inkFaint, marginTop:2 }}>SLEEP SCORE</div>
+                      <div style={{ marginTop:4 }}>
+                        <TrendPill current={lastSleep.sleep_score} previous={prevSleep?.sleep_score} higherIsBetter={true}/>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Ring gauges */}
+                {/* Arc gauges */}
                 <div style={{ display:"flex", justifyContent:"space-around" }}>
-                  {[
-                    { value:lastSleep.sleep_hrs, max:9, color:scoreCol(lastSleep.sleep_hrs,6,7.5), label:"Total", sub:lastSleep.sleep_hrs?`${lastSleep.sleep_hrs}h`:"—", center:<span style={{fontSize:16,fontWeight:800,color:DC.text}}>{lastSleep.sleep_hrs||"—"}</span> },
-                    { value:lastSleep.deep_hrs?Math.round(lastSleep.deep_hrs/lastSleep.sleep_hrs*100):0, max:25, color:DC.blue, label:"Deep", sub:lastSleep.deep_hrs?`${lastSleep.deep_hrs}h`:"—", center:<span style={{fontSize:14,fontWeight:700,color:DC.text}}>{lastSleep.deep_hrs?Math.round(lastSleep.deep_hrs/lastSleep.sleep_hrs*100)+"%":"—"}</span> },
-                    { value:lastSleep.rem_hrs?Math.round(lastSleep.rem_hrs/lastSleep.sleep_hrs*100):0, max:30, color:DC.purple, label:"REM", sub:lastSleep.rem_hrs?`${lastSleep.rem_hrs}h`:"—", center:<span style={{fontSize:14,fontWeight:700,color:DC.text}}>{lastSleep.rem_hrs?Math.round(lastSleep.rem_hrs/lastSleep.sleep_hrs*100)+"%":"—"}</span> },
-                    { value:lastSleep.avg_spo2, max:100, color:scoreCol(lastSleep.avg_spo2,93,96), label:"SpO₂", sub:lastSleep.avg_spo2?`${lastSleep.avg_spo2}%`:"—", center:<span style={{fontSize:14,fontWeight:700,color:DC.text}}>{lastSleep.avg_spo2||"—"}</span> },
-                  ].map((g,i)=>(
-                    <RingGauge key={i} {...g} size={70} stroke={6}
-                      trackColor="rgba(255,255,255,0.07)"/>
-                  ))}
+                  <ArcGauge value={lastSleep.sleep_hrs} goal={goals.avgSleepHrs} max={10}
+                    size={100} color={K.teal} unit="h" label="Total"
+                    trackColor="#e0ede9"/>
+                  <ArcGauge value={lastSleep.deep_hrs} goal={+(lastSleep.sleep_hrs*0.18).toFixed(1)} max={3}
+                    size={100} color={K.blue} unit="h" label="Deep"
+                    trackColor="#dce8f5"/>
+                  <ArcGauge value={lastSleep.rem_hrs} goal={+(lastSleep.sleep_hrs*0.21).toFixed(1)} max={3}
+                    size={100} color="#7c52c8" unit="h" label="REM"
+                    trackColor="#ede8f8"/>
+                  <ArcGauge value={lastSleep.avg_spo2} goal={96} max={100}
+                    size={100} color={lastSleep.avg_spo2>=95?K.teal:K.yellow} unit="%" label="SpO₂"
+                    trackColor="#e0ede9"/>
                 </div>
               </div>
 
               {/* Stage bar */}
               {(lastSleep.deep_hrs||lastSleep.rem_hrs||lastSleep.light_hrs) && (
-                <div style={cardStyle}>
-                  <div style={labelStyle}>Stage breakdown</div>
-                  <div style={{ display:"flex", height:8, borderRadius:4, overflow:"hidden", gap:1, marginBottom:10 }}>
-                    {lastSleep.deep_hrs  && <div style={{ flex:lastSleep.deep_hrs,  background:DC.blue,   borderRadius:"4px 0 0 4px" }}/>}
-                    {lastSleep.rem_hrs   && <div style={{ flex:lastSleep.rem_hrs,   background:DC.purple }}/>}
-                    {lastSleep.light_hrs && <div style={{ flex:lastSleep.light_hrs, background:DC.card3,  borderRadius:"0 4px 4px 0" }}/>}
+                <div style={card}>
+                  <div style={{ ...sectionLabel, marginBottom:10 }}>Stage breakdown</div>
+                  <div style={{ display:"flex", height:10, borderRadius:5, overflow:"hidden", gap:1, marginBottom:10 }}>
+                    {lastSleep.deep_hrs  && <div style={{ flex:lastSleep.deep_hrs,  background:K.blue, opacity:0.85 }}/>}
+                    {lastSleep.rem_hrs   && <div style={{ flex:lastSleep.rem_hrs,   background:"#7c52c8", opacity:0.85 }}/>}
+                    {lastSleep.light_hrs && <div style={{ flex:lastSleep.light_hrs, background:K.border }}/>}
                   </div>
                   <div style={{ display:"flex", gap:14, flexWrap:"wrap" }}>
-                    {[["Deep",DC.blue,lastSleep.deep_hrs],["REM",DC.purple,lastSleep.rem_hrs],["Light",DC.card3,lastSleep.light_hrs]].map(([l,c,h])=>h&&(
-                      <div key={l} style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    {[["Deep",K.blue,lastSleep.deep_hrs,0.13,0.23],["REM","#7c52c8",lastSleep.rem_hrs,0.20,0.25],["Light",K.inkFaint,lastSleep.light_hrs,null,null]].map(([l,c,h,lo,hi])=>h&&(
+                      <div key={l} style={{ display:"flex", alignItems:"center", gap:5 }}>
                         <div style={{ width:8, height:8, borderRadius:2, background:c }}/>
-                        <span style={{ fontSize:12, color:DC.text2, fontWeight:500 }}>{l} · {h}h · {Math.round(h/lastSleep.sleep_hrs*100)}%</span>
+                        <span style={{ fontSize:11, color:K.inkMid, fontWeight:500 }}>
+                          {l} {h}h · {Math.round(h/lastSleep.sleep_hrs*100)}%
+                          {lo&&hi&&<span style={{ color: h/lastSleep.sleep_hrs>=lo&&h/lastSleep.sleep_hrs<=hi ? K.teal : K.yellow,
+                            marginLeft:4, fontSize:10 }}>
+                            {h/lastSleep.sleep_hrs>=lo&&h/lastSleep.sleep_hrs<=hi ? "✓" : "optimal "+Math.round(lo*100)+"–"+Math.round(hi*100)+"%"}
+                          </span>}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -4013,270 +4112,249 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
               )}
 
               {/* Vitals */}
-              {(lastSleep.avg_hr_sleep||lastSleep.avg_respiration) && (
-                <div style={{ ...cardStyle, display:"flex", gap:16, flexWrap:"wrap" }}>
+              {(lastSleep.avg_hr_sleep||lastSleep.avg_respiration||lastSleep.avg_spo2) && (
+                <div style={{ ...card, display:"flex", gap:20, flexWrap:"wrap" }}>
                   {lastSleep.avg_hr_sleep && (
-                    <div style={{ flex:1, minWidth:80 }}>
-                      <div style={labelStyle}>HR sleep</div>
-                      <div style={{ fontSize:26, fontWeight:700, color:DC.red }}>
-                        {Math.round(lastSleep.avg_hr_sleep)}<span style={{ fontSize:12, color:DC.text3, marginLeft:3 }}>bpm</span>
-                      </div>
+                    <div>
+                      <div style={{ ...sectionLabel, marginBottom:4 }}>HR during sleep</div>
+                      <span style={{ fontSize:24, fontWeight:800, color:K.ink }}>{Math.round(lastSleep.avg_hr_sleep)}</span>
+                      <span style={{ fontSize:12, color:K.inkFaint, marginLeft:3 }}>bpm</span>
                     </div>
                   )}
                   {lastSleep.avg_respiration && (
-                    <div style={{ flex:1, minWidth:80 }}>
-                      <div style={labelStyle}>Respiration</div>
-                      <div style={{ fontSize:26, fontWeight:700, color:DC.teal }}>
-                        {lastSleep.avg_respiration}<span style={{ fontSize:12, color:DC.text3, marginLeft:3 }}>br/m</span>
-                      </div>
+                    <div>
+                      <div style={{ ...sectionLabel, marginBottom:4 }}>Respiration</div>
+                      <span style={{ fontSize:24, fontWeight:800, color:K.ink }}>{lastSleep.avg_respiration}</span>
+                      <span style={{ fontSize:12, color:K.inkFaint, marginLeft:3 }}>br/min</span>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* 7-night sparkline */}
-              {sleepDays.length > 2 && (
-                <div style={cardStyle}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-                    <div style={labelStyle}>Sleep score · 7 nights</div>
+              {/* 7-night trend */}
+              {sleepDays.length>2 && (
+                <div style={card}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+                    <div style={sectionLabel}>Sleep score · 7 nights</div>
                     <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                      {avgSleepScore && <span style={{ fontSize:13, fontWeight:700, color:scoreCol(avgSleepScore,60,80) }}>avg {avgSleepScore}</span>}
-                      <TrendBadge current={avg7sleep} previous={avg14sleep} unit="h" higherIsBetter={true}/>
+                      {avgSleepScore && <span style={{ fontSize:13, fontWeight:700, color:avgSleepScore>=75?K.teal:K.yellow }}>avg {avgSleepScore}</span>}
+                      <TrendPill current={avgSleepScore} previous={prevSleepScore} higherIsBetter={true}/>
                     </div>
                   </div>
-                  <MiniSparkLine data={[...sleepDays.slice(0,7)].reverse().map(d=>d.sleep_score||0)}
-                    color={DC.purple} height={48}/>
-                  <div style={{ display:"flex", justifyContent:"space-between", marginTop:6 }}>
-                    <span style={{ fontSize:9, color:DC.text3 }}>{sleepDays[6]?.date?.slice(5)}</span>
-                    <span style={{ fontSize:9, color:DC.text3 }}>{sleepDays[0]?.date?.slice(5)}</span>
-                  </div>
+                  <TrendLine data={[...sleepDays.slice(0,7)].reverse().map(d=>d.sleep_score||0)}
+                    color={K.teal} height={50} goalLine={goals.sleepScore}/>
                 </div>
               )}
 
               {/* Nightly log */}
-              {sleepDays.length > 1 && (
-                <div style={cardStyle}>
-                  <div style={{ ...labelStyle, marginBottom:12 }}>Nightly log</div>
-                  {sleepDays.slice(0,7).map((d,i)=>(
-                    <div key={i} style={{ display:"flex", alignItems:"center", gap:10,
-                      padding:"9px 0", borderBottom:i<sleepDays.slice(0,7).length-1?`1px solid rgba(255,255,255,0.06)`:"none" }}>
-                      <div style={{ width:46, flexShrink:0, fontSize:11, fontWeight:600,
-                        color:i===0?domain.color:DC.text3 }}>{d.date?.slice(5)}</div>
-                      <div style={{ flex:1, display:"flex", gap:10 }}>
-                        {d.sleep_hrs && <span style={{ fontSize:12, fontWeight:600, color:DC.text }}>{d.sleep_hrs}h</span>}
-                        {d.deep_hrs  && <span style={{ fontSize:11, color:DC.blue }}>D {d.deep_hrs}h</span>}
-                        {d.rem_hrs   && <span style={{ fontSize:11, color:DC.purple }}>R {d.rem_hrs}h</span>}
-                        {d.avg_spo2  && <span style={{ fontSize:11, color:DC.text3 }}>SpO₂ {d.avg_spo2}%</span>}
-                      </div>
+              <div style={card}>
+                <div style={{ ...sectionLabel, marginBottom:10 }}>Nightly log</div>
+                {sleepDays.slice(0,7).map((d,i)=>(
+                  <div key={i} style={{ display:"flex", alignItems:"center", gap:10,
+                    padding:"8px 0", borderBottom:i<sleepDays.slice(0,7).length-1?`1px solid ${K.border}`:"none" }}>
+                    <div style={{ width:44, flexShrink:0, fontSize:11, fontWeight:600,
+                      color:i===0?domain.color:K.inkFaint }}>{d.date?.slice(5)}</div>
+                    <div style={{ flex:1, display:"flex", gap:10 }}>
+                      {d.sleep_hrs && <span style={{ fontSize:12, fontWeight:600, color:K.ink }}>{d.sleep_hrs}h</span>}
+                      {d.deep_hrs  && <span style={{ fontSize:11, color:K.blue }}>D {d.deep_hrs}h</span>}
+                      {d.rem_hrs   && <span style={{ fontSize:11, color:"#7c52c8" }}>R {d.rem_hrs}h</span>}
+                    </div>
+                    <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                      {d.avg_spo2 && <span style={{ fontSize:10, color:K.inkFaint }}>SpO₂ {d.avg_spo2}%</span>}
                       {d.sleep_score && (
-                        <div style={{ fontSize:15, fontWeight:800, color:scoreCol(d.sleep_score,60,80), flexShrink:0 }}>
+                        <span style={{ fontSize:15, fontWeight:800,
+                          color:d.sleep_score>=75?K.teal:d.sleep_score>=60?K.yellow:K.red }}>
                           {d.sleep_score}
-                        </div>
+                        </span>
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
+                ))}
+              </div>
             </>
           )}
         </>
       )}
 
+      {/* ── HEALTH ───────────────────────────────────────────────────────── */}
       {tab==="health" && (
         <>
-          {/* Hero row */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:12 }}>
-            {[
-              { label:"Resting HR", val:today?.resting_hr, unit:"bpm", prev:avgRHR14, hi:false,
-                color: today?.resting_hr?scoreCol(85-today.resting_hr,10,25):DC.text2,
-                gradient:"linear-gradient(135deg,#2a1c1c,#1a0f0f)", border:`${DC.red}33` },
-              { label:"Stress", val:today?.stress_avg?Math.round(today.stress_avg):null, unit:"", prev:avgStress14, hi:false,
-                color: today?.stress_avg?(today.stress_avg<26?DC.green:today.stress_avg<51?DC.orange:DC.red):DC.text2,
-                gradient:"linear-gradient(135deg,#1c2a1c,#0f1a0f)", border:`${DC.green}33` },
-              { label:"Steps", val:today?.steps?Math.round(today.steps/1000*10)/10:null, unit:"k", prev:null, hi:true,
-                color:today?.steps?scoreCol(today.steps/11000*100,50,90):DC.text2,
-                gradient:"linear-gradient(135deg,#1a1c2a,#0f0f1a)", border:`${DC.blue}33` },
-            ].map((m,i)=>(
-              <div key={i} style={{ background:m.gradient, borderRadius:14, padding:"14px 12px",
-                border:`1px solid ${m.border}` }}>
-                <div style={{ fontSize:9, color:DC.text3, textTransform:"uppercase",
-                  letterSpacing:"0.08em", fontWeight:600, marginBottom:6 }}>{m.label}</div>
-                <div style={{ fontSize:24, fontWeight:800, color:m.color, lineHeight:1 }}>
-                  {m.val!=null?m.val:"—"}<span style={{ fontSize:11, color:DC.text3 }}>{m.unit}</span>
-                </div>
-                {m.prev!=null && m.val!=null && (
-                  <div style={{ marginTop:4 }}>
-                    <TrendBadge current={m.val} previous={m.prev} higherIsBetter={m.hi}/>
-                  </div>
-                )}
-              </div>
-            ))}
+          <GoalEditor goals={goals} onChange={saveGoals} fields={[
+            {id:"stressTarget",label:"Stress target (lower)"},{id:"restingHRTarget",label:"Resting HR target"},
+            {id:"dailySteps",label:"Daily steps goal"},
+          ]}/>
+
+          {/* Arc gauges */}
+          <div style={card}>
+            <div style={{ display:"flex", justifyContent:"space-around" }}>
+              <ArcGauge value={today?.resting_hr} goal={goals.restingHRTarget} max={100}
+                size={100} color={K.red} unit="bpm" label="Resting HR"
+                trackColor="#f0e0de"
+                showGoalTick={true}/>
+              {/* Stress: lower is better, so invert — show "calm score" */}
+              <ArcGauge value={today?.stress_avg?Math.max(0,100-Math.round(today.stress_avg)):null}
+                goal={100-goals.stressTarget} max={100}
+                size={100} color={K.teal} unit="" label="Calm score"
+                trackColor="#e0ede9"/>
+              <ArcGauge value={today?.steps} goal={goals.dailySteps} max={goals.dailySteps*1.3}
+                size={100} color={K.yellow} unit="" label="Steps"
+                trackColor="#f0ecde"/>
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-around", paddingTop:10, borderTop:`1px solid ${K.border}`, marginTop:8 }}>
+              <TrendPill current={avgRHR7} previous={avgRHR14} higherIsBetter={false}/>
+              <TrendPill current={avgStress7} previous={avgStress14} higherIsBetter={false}/>
+              <TrendPill current={today?.steps} previous={daily[1]?.steps} higherIsBetter={true}/>
+            </div>
           </div>
 
           {/* Stress trend */}
-          <div style={cardStyle}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-              <div style={labelStyle}>Stress · 14 days</div>
+          <div style={card}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+              <div style={sectionLabel}>Stress · 14 days</div>
               <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                {avgStress7!=null && <span style={{ fontSize:13, fontWeight:700, color:avgStress7<26?DC.green:avgStress7<51?DC.orange:DC.red }}>avg {avgStress7}</span>}
-                <TrendBadge current={avgStress7} previous={avgStress14} higherIsBetter={false}/>
+                {avgStress7!=null&&<span style={{ fontSize:13, fontWeight:700, color:avgStress7<30?K.teal:avgStress7<50?K.yellow:K.red }}>{avgStress7} avg</span>}
+                <TrendPill current={avgStress7} previous={avgStress14} higherIsBetter={false}/>
               </div>
             </div>
-            <MiniSparkLine data={[...week14].reverse().map(d=>d.stress_avg||0)}
-              color={avgStress7!=null?(avgStress7<26?DC.green:avgStress7<51?DC.orange:DC.red):DC.text2} height={52}/>
-            <div style={{ display:"flex", gap:12, marginTop:8 }}>
-              {[["<26","calm",DC.green],["26–50","moderate",DC.orange],["50+","stressed",DC.red]].map(([v,l,c])=>(
+            <TrendLine data={[...week14].reverse().map(d=>d.stress_avg||0)}
+              color={avgStress7!=null?(avgStress7<30?K.teal:avgStress7<50?K.yellow:K.red):K.inkFaint}
+              height={50} goalLine={goals.stressTarget}/>
+            <div style={{ display:"flex", gap:12, marginTop:6 }}>
+              {[["< 30","calm",K.teal],["30–50","moderate",K.yellow],["50+","stressed",K.red]].map(([v,l,c])=>(
                 <div key={l} style={{ display:"flex", alignItems:"center", gap:4 }}>
                   <div style={{ width:6, height:6, borderRadius:"50%", background:c }}/>
-                  <span style={{ fontSize:9, color:DC.text3 }}>{v} {l}</span>
+                  <span style={{ fontSize:9, color:K.inkFaint }}>{v} {l}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Resting HR trend */}
-          <div style={cardStyle}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-              <div style={labelStyle}>Resting HR · 14 days</div>
-              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                {avgRHR7!=null && <span style={{ fontSize:13, fontWeight:700, color:DC.text2 }}>avg {avgRHR7} bpm</span>}
-                <TrendBadge current={avgRHR7} previous={avgRHR14} higherIsBetter={false}/>
-              </div>
+          {/* RHR trend */}
+          <div style={card}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+              <div style={sectionLabel}>Resting HR · 14 days</div>
+              {avgRHR7!=null&&<span style={{ fontSize:12, fontWeight:600, color:K.inkMid }}>{avgRHR7} bpm avg</span>}
             </div>
-            <MiniSparkLine data={[...week14].reverse().map(d=>d.resting_hr||0)} color={DC.red} height={44}/>
+            <TrendLine data={[...week14].reverse().map(d=>d.resting_hr||0)}
+              color={K.red} height={44} goalLine={goals.restingHRTarget}/>
           </div>
 
           {/* Daily log */}
-          <div style={cardStyle}>
-            <div style={{ ...labelStyle, marginBottom:12 }}>Daily log</div>
+          <div style={card}>
+            <div style={{ ...sectionLabel, marginBottom:10 }}>Daily log</div>
             {week7.map((d,i)=>(
-              <div key={i} style={{ display:"flex", alignItems:"center", gap:10,
-                padding:"8px 0", borderBottom:i<6?`1px solid rgba(255,255,255,0.06)`:"none" }}>
-                <div style={{ width:48, flexShrink:0, fontSize:11, fontWeight:600,
-                  color:i===0?domain.color:DC.text3 }}>{d.date?.slice(5)}</div>
+              <div key={i} style={{ display:"flex", alignItems:"center", gap:8,
+                padding:"8px 0", borderBottom:i<6?`1px solid ${K.border}`:"none" }}>
+                <div style={{ width:44, flexShrink:0, fontSize:11, fontWeight:600,
+                  color:i===0?domain.color:K.inkFaint }}>{d.date?.slice(5)}</div>
                 <div style={{ flex:1, display:"flex", gap:10, flexWrap:"wrap" }}>
-                  {d.steps && <span style={{ fontSize:11, color:DC.text2 }}>{(d.steps/1000).toFixed(1)}k</span>}
-                  {d.stress_avg && <span style={{ fontSize:11, color:d.stress_avg<26?DC.green:d.stress_avg<51?DC.orange:DC.red }}>
-                    s:{Math.round(d.stress_avg)}</span>}
-                  {d.resting_hr && <span style={{ fontSize:11, color:DC.text3 }}>{d.resting_hr}bpm</span>}
+                  {d.steps&&<span style={{ fontSize:11, color:K.inkMid }}>{(d.steps/1000).toFixed(1)}k steps</span>}
+                  {d.stress_avg&&<span style={{ fontSize:11, color:d.stress_avg<30?K.teal:d.stress_avg<50?K.yellow:K.red }}>
+                    stress {Math.round(d.stress_avg)}</span>}
+                  {d.resting_hr&&<span style={{ fontSize:11, color:K.inkFaint }}>{d.resting_hr} bpm</span>}
                 </div>
-                {d.stress_qualifier && (
-                  <span style={{ fontSize:9, color:DC.text3, flexShrink:0, maxWidth:80,
-                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                    {d.stress_qualifier.toLowerCase().replace(/_/g," ")}
-                  </span>
-                )}
               </div>
             ))}
           </div>
         </>
       )}
 
+      {/* ── FUEL ─────────────────────────────────────────────────────────── */}
       {tab==="nutrition" && (
         <>
-          {/* Macro rings */}
+          <GoalEditor goals={goals} onChange={saveGoals} fields={[
+            {id:"dailyCal",label:"Daily calories"},{id:"dailyProtein",label:"Protein (g)"},
+          ]}/>
+
           {todayMeals.length>0 && (
-            <div style={{ ...cardStyle, background:"linear-gradient(135deg,#1a1f1a,#0f160f)",
-              border:`1px solid ${DC.green}22` }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-                <div>
-                  <div style={labelStyle}>Today</div>
-                  <div style={{ fontSize:32, fontWeight:800, color:DC.green, lineHeight:1 }}>
-                    {totalCal}<span style={{ fontSize:14, color:DC.text3, marginLeft:4 }}>kcal</span>
-                  </div>
-                </div>
-                <div style={{ width:60, height:60, borderRadius:"50%",
-                  background:`conic-gradient(${DC.green} ${totalCal/2200*360}deg, rgba(255,255,255,0.05) 0deg)`,
-                  display:"flex", alignItems:"center", justifyContent:"center" }}>
-                  <div style={{ width:44, height:44, borderRadius:"50%", background:DC.card,
-                    display:"flex", alignItems:"center", justifyContent:"center" }}>
-                    <span style={{ fontSize:11, fontWeight:700, color:DC.text }}>{Math.round(totalCal/2200*100)}%</span>
-                  </div>
-                </div>
+            <div style={card}>
+              <div style={{ ...sectionLabel, marginBottom:12 }}>Today</div>
+              <div style={{ display:"flex", justifyContent:"space-around", marginBottom:12 }}>
+                <ArcGauge value={totalCal} goal={goals.dailyCal} max={goals.dailyCal*1.4}
+                  size={100} color={K.yellow} unit="kcal" label="Calories" trackColor="#f0ecde"/>
+                <ArcGauge value={Math.round(totalPro)} goal={goals.dailyProtein} max={goals.dailyProtein*1.5}
+                  size={100} color={K.blue} unit="g" label="Protein" trackColor="#dce8f5"/>
               </div>
-              <div style={{ display:"flex", gap:12 }}>
-                {[["P",totalPro,"g",DC.blue,150],["C",totalCarb,"g",DC.orange,250],["F",totalFat,"g","#ff9f0a",80]].map(([l,v,u,c,goal])=>(
+              {/* Macro mini bars */}
+              <div style={{ display:"flex", gap:10 }}>
+                {[["Carbs",totalCarb,250,K.yellow],["Fat",totalFat,80,"#c0392b"]].map(([l,v,g,c])=>(
                   <div key={l} style={{ flex:1 }}>
-                    <div style={{ height:3, background:"rgba(255,255,255,0.06)", borderRadius:2, marginBottom:5 }}>
-                      <div style={{ width:`${Math.min(100,v/goal*100)}%`, height:"100%", background:c, borderRadius:2 }}/>
+                    <div style={{ fontSize:9, color:K.inkFaint, marginBottom:4, fontWeight:600,
+                      textTransform:"uppercase", letterSpacing:"0.07em" }}>{l} {Math.round(v)}g</div>
+                    <div style={{ height:4, background:K.border, borderRadius:2 }}>
+                      <div style={{ width:`${Math.min(100,v/g*100)}%`, height:"100%", background:c, borderRadius:2 }}/>
                     </div>
-                    <div style={{ fontSize:16, fontWeight:700, color:c }}>{Math.round(v)}<span style={{ fontSize:10, color:DC.text3, marginLeft:2 }}>{u}</span></div>
-                    <div style={{ fontSize:9, color:DC.text3 }}>{l === "P" ? "Protein" : l === "C" ? "Carbs" : "Fat"}</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Snap button */}
           <div style={{ marginBottom:12 }}>
             <input ref={foodInputRef} type="file" accept="image/*" style={{ display:"none" }}
               onChange={e=>{if(e.target.files?.[0])analyzeFood(e.target.files[0]);}}/>
             <button onClick={()=>foodInputRef.current?.click()} disabled={analyzing}
-              style={{ width:"100%", background: analyzing ? DC.card2 : `linear-gradient(135deg,${DC.green},#28b050)`,
-                border:"none", borderRadius:14, color:"#000", fontSize:15, fontWeight:700,
-                padding:"16px", cursor:analyzing?"default":"pointer", letterSpacing:"0.01em" }}>
-              {analyzing ? "🔍 Analyzing meal…" : "📷 Log a meal"}
+              style={{ width:"100%", background: analyzing ? K.warm : K.ink,
+                border:"none", borderRadius:12, color:"#fff", fontSize:14, fontWeight:700,
+                padding:"14px", cursor:analyzing?"default":"pointer" }}>
+              {analyzing ? "🔍 Analyzing…" : "📷 Log a meal"}
             </button>
             {!analyzing && (
               <input dir="ltr" value={mealNote} onChange={e=>setMealNote(e.target.value)}
                 placeholder="Add context (optional)…"
                 style={{ width:"100%", marginTop:8, background:"transparent", border:"none",
-                  borderBottom:`1px solid rgba(255,255,255,0.1)`, color:DC.text, fontSize:13,
-                  padding:"6px 0", outline:"none", boxSizing:"border-box" }}/>
+                  borderBottom:`1px solid ${K.border}`, color:K.ink, fontSize:13,
+                  padding:"5px 0", outline:"none", boxSizing:"border-box" }}/>
             )}
           </div>
 
-          {/* Today's meals */}
           {todayMeals.length>0 && (
-            <div style={cardStyle}>
-              <div style={{ ...labelStyle, marginBottom:12 }}>Today's meals</div>
+            <div style={card}>
+              <div style={{ ...sectionLabel, marginBottom:10 }}>Today's meals</div>
               {todayMeals.map((m,i)=>(
-                <div key={i} style={{ padding:"10px 0", borderBottom:i<todayMeals.length-1?`1px solid rgba(255,255,255,0.06)`:"none" }}>
+                <div key={i} style={{ padding:"10px 0", borderBottom:i<todayMeals.length-1?`1px solid ${K.border}`:"none" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:4 }}>
-                    <div>
-                      <div style={{ fontSize:14, fontWeight:600, color:DC.text }}>{m.name}</div>
-                      {m.note && <div style={{ fontSize:11, color:DC.text3, marginTop:1 }}>{m.note}</div>}
+                    <div style={{ flex:1, minWidth:0, marginRight:8 }}>
+                      <div style={{ fontSize:13, fontWeight:600, color:K.ink }}>{m.name}</div>
+                      {m.note&&<div style={{ fontSize:11, color:K.inkFaint }}>{m.note}</div>}
                     </div>
-                    <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                      <span style={{ fontSize:14, fontWeight:700, color:DC.green }}>{m.calories}</span>
-                      <span style={{ fontSize:11, color:DC.text3 }}>kcal</span>
-                      <button onClick={()=>{ const u=meals.filter((_,j)=>j!==meals.indexOf(m)); setMeals(u); onUpdate({...domain,meals:u}); }}
-                        style={{ background:"transparent", border:"none", color:DC.text3, cursor:"pointer", fontSize:16, padding:0 }}>×</button>
+                    <div style={{ display:"flex", gap:6, alignItems:"center", flexShrink:0 }}>
+                      <span style={{ fontSize:14, fontWeight:700, color:K.yellow }}>{m.calories} kcal</span>
+                      <button onClick={()=>{const u=meals.filter((_,j)=>j!==meals.indexOf(m));setMeals(u);onUpdate({...domain,meals:u});}}
+                        style={{ background:"transparent", border:"none", color:K.inkFaint, cursor:"pointer", fontSize:15, padding:0 }}>×</button>
                     </div>
                   </div>
                   <div style={{ display:"flex", gap:10 }}>
-                    {[["P",m.protein_g,DC.blue],["C",m.carbs_g,DC.orange],["F",m.fat_g,"#ff9f0a"]].map(([l,v,c])=>(
-                      <span key={l} style={{ fontSize:11, color:DC.text3 }}>
+                    {[["P",m.protein_g,K.blue],["C",m.carbs_g,K.yellow],["F",m.fat_g,K.red]].map(([l,v,c])=>(
+                      <span key={l} style={{ fontSize:11, color:K.inkFaint }}>
                         <span style={{ color:c, fontWeight:600 }}>{l}</span> {Math.round(v||0)}g
                       </span>
                     ))}
-                    <span style={{ fontSize:11, color:DC.text3, marginLeft:"auto" }}>{m.time}</span>
+                    <span style={{ fontSize:10, color:K.inkFaint, marginLeft:"auto" }}>{m.time}</span>
                   </div>
-                  {m.notes && <div style={{ fontSize:11, color:DC.text3, marginTop:4, fontStyle:"italic" }}>{m.notes}</div>}
                 </div>
               ))}
             </div>
           )}
 
           {meals.filter(m=>m.date!==new Date().toISOString().split("T")[0]).length>0 && (
-            <div style={cardStyle}>
-              <div style={{ ...labelStyle, marginBottom:12 }}>Previous</div>
-              {meals.filter(m=>m.date!==new Date().toISOString().split("T")[0]).slice(0,6).map((m,i)=>(
+            <div style={card}>
+              <div style={{ ...sectionLabel, marginBottom:10 }}>Previous</div>
+              {meals.filter(m=>m.date!==new Date().toISOString().split("T")[0]).slice(0,5).map((m,i,arr)=>(
                 <div key={i} style={{ display:"flex", justifyContent:"space-between",
-                  padding:"8px 0", borderBottom:i<5?`1px solid rgba(255,255,255,0.06)`:"none" }}>
+                  padding:"8px 0", borderBottom:i<arr.length-1?`1px solid ${K.border}`:"none" }}>
                   <div>
-                    <div style={{ fontSize:13, fontWeight:500, color:DC.text }}>{m.name}</div>
-                    <div style={{ fontSize:10, color:DC.text3 }}>{m.date}</div>
+                    <div style={{ fontSize:13, fontWeight:500, color:K.ink }}>{m.name}</div>
+                    <div style={{ fontSize:10, color:K.inkFaint }}>{m.date}</div>
                   </div>
-                  <span style={{ fontSize:13, fontWeight:600, color:DC.text3 }}>{m.calories} kcal</span>
+                  <span style={{ fontSize:12, fontWeight:600, color:K.inkFaint }}>{m.calories} kcal</span>
                 </div>
               ))}
             </div>
           )}
 
-          {meals.length===0 && !analyzing && (
-            <div style={{ textAlign:"center", padding:"40px 0", color:DC.text3, fontSize:13 }}>
+          {meals.length===0&&!analyzing&&(
+            <div style={{ textAlign:"center", padding:"40px 0", color:K.inkFaint, fontSize:13 }}>
               Snap your first meal to start tracking
             </div>
           )}
@@ -4287,6 +4365,7 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
     </div>
   );
 }
+
 
 
 function DomainView({ domain, onUpdate, onBack }) {
