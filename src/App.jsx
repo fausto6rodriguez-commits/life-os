@@ -3738,6 +3738,344 @@ function GoalEditor({ goals, onChange, fields }) {
   );
 }
 
+// ── EXERCISE TAB ─────────────────────────────────────────────────────────────
+function ExerciseTab({ daily, activities, goals, onSaveGoals, domain, K, card, sectionLabel }) {
+  const [recs, setRecs]         = useState(null);
+  const [loadingRecs, setLoadingRecs] = useState(false);
+
+  const runs     = activities.filter(a=>a.activity_type==="running");
+  const strength = activities.filter(a=>a.activity_type==="strength_training");
+  const mobility = activities.filter(a=>["yoga","stretching","meditation"].includes(a.activity_type));
+  const allEx    = activities.filter(a=>!["meditation"].includes(a.activity_type));
+
+  const cutoff7  = new Date(); cutoff7.setDate(cutoff7.getDate()-7);
+  const cutoff14 = new Date(); cutoff14.setDate(cutoff14.getDate()-14);
+
+  // ── Pillar classification ────────────────────────────────────────────────
+  // Zone 2: avg HR 60-75% of max (est max ~175). Zone 2 = 105-131 bpm
+  // Intensity: avg HR > 80% of max = ~140+ bpm
+  const maxHR = 175;
+  const z2Max = maxHR * 0.75;
+  const hiMin = maxHR * 0.80;
+
+  const classifyActivity = (a) => {
+    const hr = a.avg_hr;
+    const type = a.activity_type;
+    const dMin = (a.duration_seconds||0) / 60;
+    const tags = [];
+    if (type === "strength_training") return [{ label:"Strength", color:"#c0780a", bg:"#fef3e2" }];
+    if (["yoga","stretching"].includes(type)) return [{ label:"Mobility", color:"#6e3fa8", bg:"#f0eafa" }];
+    if (!hr) return [{ label:"Zone 2", color:"#2563a8", bg:"#e8f0fa" }];
+    const z2Mins = hr <= z2Max ? dMin : hr <= hiMin ? dMin * 0.6 : dMin * 0.2;
+    const hiMins = hr >= hiMin ? dMin * 0.8 : hr > z2Max ? dMin * 0.3 : 0;
+    if (z2Mins > 5) tags.push({ label:`Zone 2 · ${Math.round(z2Mins)}m`, color:"#2563a8", bg:"#e8f0fa" });
+    if (hiMins > 5) tags.push({ label:`Intensity · ${Math.round(hiMins)}m`, color:"#b03020", bg:"#fdf0e8" });
+    return tags.length ? tags : [{ label:"Zone 2", color:"#2563a8", bg:"#e8f0fa" }];
+  };
+
+  // Week totals
+  const weekActs  = allEx.filter(a=>new Date(a.date)>=cutoff7);
+  const weekActs2 = allEx.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7);
+
+  const weekZ2Min = weekActs.reduce((s,a) => {
+    const hr = a.avg_hr; const dMin = (a.duration_seconds||0)/60;
+    if (!hr || a.activity_type==="strength_training") return s;
+    return s + (hr <= z2Max ? dMin : hr <= hiMin ? dMin*0.6 : dMin*0.2);
+  }, 0);
+  const weekZ2Min2 = weekActs2.reduce((s,a) => {
+    const hr = a.avg_hr; const dMin = (a.duration_seconds||0)/60;
+    if (!hr || a.activity_type==="strength_training") return s;
+    return s + (hr <= z2Max ? dMin : hr <= hiMin ? dMin*0.6 : dMin*0.2);
+  }, 0);
+
+  const weekHiSess  = weekActs.filter(a=>a.avg_hr>=hiMin).length;
+  const weekHiSess2 = weekActs2.filter(a=>a.avg_hr>=hiMin).length;
+  const weekStr  = strength.filter(a=>new Date(a.date)>=cutoff7).length;
+  const weekStr2 = strength.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7).length;
+  const weekMob  = mobility.filter(a=>new Date(a.date)>=cutoff7).length;
+  const weekMob2 = mobility.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7).length;
+
+  const actDates = new Set(activities.map(a=>a.date));
+  let streak = 0;
+  for (let i=0;i<30;i++) { const d=new Date(); d.setDate(d.getDate()-i); const ds=d.toISOString().split("T")[0]; if(actDates.has(ds))streak++; else if(i>0)break; }
+
+  const bestPace = runs.filter(r=>r.avg_pace_min_per_km).sort((a,b)=>a.avg_pace_min_per_km-b.avg_pace_min_per_km)[0];
+  const avgDur   = weekActs.length ? Math.round(weekActs.reduce((s,a)=>s+(a.duration_seconds||0),0)/weekActs.length/60) : null;
+  const formatDur = s => { if(!s)return"—"; const m=Math.round(s/60); return m>=60?`${Math.floor(m/60)}h${m%60?m%60+"m":""}`:m+"m"; };
+  const actIcon = t => ({running:"🏃",strength_training:"💪",cycling:"🚴",swimming:"🏊",meditation:"🧘",walking:"🚶",yoga:"🧘",hiking:"🥾"}[t]||"⚡");
+
+  // Group activities by type+day for breakdown
+  const grouped = [];
+  const runGroup = weekActs.filter(a=>a.activity_type==="running");
+  const strGroup = weekActs.filter(a=>a.activity_type==="strength_training");
+  const mobGroup = weekActs.filter(a=>["yoga","stretching","meditation"].includes(a.activity_type));
+  const otherGroup = weekActs.filter(a=>!["running","strength_training","yoga","stretching","meditation"].includes(a.activity_type));
+
+  if (runGroup.length > 0) {
+    const totalMin = Math.round(runGroup.reduce((s,a)=>s+(a.duration_seconds||0),0)/60);
+    const totalKm  = runGroup.reduce((s,a)=>s+((a.distance_meters||0)/1000),0);
+    const avgHR    = runGroup.filter(r=>r.avg_hr).length ? Math.round(runGroup.filter(r=>r.avg_hr).reduce((s,r)=>s+r.avg_hr,0)/runGroup.filter(r=>r.avg_hr).length) : null;
+    const z2Min = Math.round(runGroup.reduce((s,a)=>{ const hr=a.avg_hr,dMin=(a.duration_seconds||0)/60; return s+(hr<=z2Max?dMin:hr<=hiMin?dMin*0.6:dMin*0.2); },0));
+    const hiMin2 = Math.round(runGroup.reduce((s,a)=>{ const hr=a.avg_hr,dMin=(a.duration_seconds||0)/60; return s+(hr>=hiMin?dMin*0.8:hr>z2Max?dMin*0.3:0); },0));
+    grouped.push({ icon:"🏃", label:`${runGroup.length} run${runGroup.length>1?"s":""}`, sub:`${totalMin}min · ${totalKm.toFixed(1)}km${avgHR?` · ${avgHR}bpm`:""}`, tags:[
+      ...(z2Min>0?[{label:`Zone 2 · ${z2Min}m`,color:"#2563a8",bg:"#e8f0fa"}]:[]),
+      ...(hiMin2>0?[{label:`Intensity · ${hiMin2}m`,color:"#b03020",bg:"#fdf0e8"}]:[]),
+    ]});
+  }
+  if (strGroup.length > 0) {
+    const totalMin = Math.round(strGroup.reduce((s,a)=>s+(a.duration_seconds||0),0)/60);
+    grouped.push({ icon:"💪", label:`${strGroup.length} strength session${strGroup.length>1?"s":""}`, sub:`${totalMin}min total`, tags:[{label:`Strength · ${strGroup.length}×`,color:"#c0780a",bg:"#fef3e2"}] });
+  }
+  if (mobGroup.length > 0) {
+    const totalMin = Math.round(mobGroup.reduce((s,a)=>s+(a.duration_seconds||0),0)/60);
+    grouped.push({ icon:"🧘", label:`${mobGroup.length} mobility session${mobGroup.length>1?"s":""}`, sub:`${totalMin}min total`, tags:[{label:`Mobility · ${mobGroup.length}×`,color:"#6e3fa8",bg:"#f0eafa"}] });
+  }
+  otherGroup.forEach(a => {
+    const tags = classifyActivity(a);
+    grouped.push({ icon:actIcon(a.activity_type), label:a.name||a.activity_type?.replace(/_/g," "), sub:`${formatDur(a.duration_seconds)}${a.avg_hr?` · ${Math.round(a.avg_hr)}bpm`:""}`, tags });
+  });
+
+  // Next week plan
+  const getNextWeekPlan = async () => {
+    setLoadingRecs(true);
+    try {
+      const today = new Date();
+      const weekStart = new Date(today); weekStart.setDate(today.getDate() + (1 - today.getDay() + 7) % 7 || 7);
+      const days = Array.from({length:7}, (_,i) => { const d=new Date(weekStart); d.setDate(weekStart.getDate()+i); return d; });
+      const prompt = `You are a personal trainer focused on longevity. Based on this week's data, plan next week's exercise.
+
+THIS WEEK:
+- Zone 2 cardio: ${Math.round(weekZ2Min)} min (goal: ${goals.z2MinGoal||180} min)
+- Strength: ${weekStr} sessions (goal: ${goals.weeklyStrength||3})
+- High intensity: ${weekHiSess} sessions (goal: ${goals.weeklyHi||2})
+- Mobility: ${weekMob} sessions (goal: ${goals.weeklyMob||3})
+- Streak: ${streak} days
+- Avg stress this week: ${daily[0]?.stress_avg ? Math.round(daily[0].stress_avg) : "unknown"}
+
+NEXT WEEK DATES: ${days.map(d=>d.toLocaleDateString("en-US",{weekday:"short",month:"numeric",day:"numeric"})).join(", ")}
+
+Return ONLY a JSON object (no markdown):
+{
+  "summary": "one line: what changes vs this week",
+  "days": [
+    {"date":"Mon Jun 8","activities":[{"type":"zone2","label":"Easy run","duration":"40m","pillar":"zone2"},...]},
+    ...7 days total, use "rest" for rest days
+  ],
+  "notes": ["max 3 short coaching notes, each under 15 words"]
+}
+Pillar values: "zone2", "strength", "intensity", "mobility", "rest"`;
+
+      const resp = await fetch("/api/claude", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:800,
+          messages:[{role:"user",content:prompt}] })
+      });
+      const data = await resp.json();
+      const text = data.content?.find(b=>b.type==="text")?.text||"{}";
+      const plan = JSON.parse(text.replace(/```json|```/g,"").trim());
+      setRecs(plan);
+    } catch(e) { console.error(e); }
+    setLoadingRecs(false);
+  };
+
+  const pillarColor = { zone2:"#2563a8", strength:"#c0780a", intensity:"#b03020", mobility:"#6e3fa8", rest:K.border };
+  const pillarBg    = { zone2:"#e8f0fa", strength:"#fef3e2", intensity:"#fdf0e8", mobility:"#f0eafa", rest:"#f7f4f0" };
+
+  return (
+    <>
+      <GoalEditor goals={goals} onChange={onSaveGoals} fields={[
+        {id:"z2MinGoal",label:"Zone 2 min/week"},{id:"weeklyStrength",label:"Strength sessions"},
+        {id:"weeklyHi",label:"Intensity sessions"},{id:"weeklyMob",label:"Mobility sessions"},
+      ]}/>
+
+      {/* ── SCORECARD ── */}
+      <div style={{...card}}>
+        <div style={{ fontSize:9, color:K.inkFaint, textTransform:"uppercase", letterSpacing:"0.11em", fontWeight:700, marginBottom:16 }}>
+          This week
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:2, marginBottom:8 }}>
+          {[
+            { value:Math.round(weekZ2Min), goal:goals.z2MinGoal||180, max:240, color:"#2563a8", label:"Zone 2", unit:"min", prev:Math.round(weekZ2Min2) },
+            { value:weekStr, goal:goals.weeklyStrength||3, max:7, color:"#c0780a", label:"Strength", unit:"", prev:weekStr2 },
+            { value:weekHiSess, goal:goals.weeklyHi||2, max:5, color:"#b03020", label:"Intensity", unit:"", prev:weekHiSess2 },
+            { value:weekMob, goal:goals.weeklyMob||3, max:7, color:"#6e3fa8", label:"Mobility", unit:"", prev:weekMob2 },
+          ].map((g,i) => {
+            const pct = Math.min(1, g.value/(g.max||1));
+            const goalPct = Math.min(1, g.goal/(g.max||1));
+            const arcSpan = 0.75;
+            const r=36, cx=46, cy=46, size=92;
+            const circ = 2*Math.PI*r;
+            const dashVal  = pct * arcSpan * circ;
+            const dashGoal = goalPct * arcSpan * circ;
+            const diff = g.value - g.prev;
+            const up = diff > 0;
+            const good = up;
+            const atGoal = g.value >= g.goal;
+            return (
+              <div key={i} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
+                <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+                  <g transform={`rotate(144 ${cx} ${cy})`}>
+                    <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e8e2d9" strokeWidth="6" strokeLinecap="round"
+                      strokeDasharray={`${arcSpan*circ} ${circ}`}/>
+                    <circle cx={cx} cy={cy} r={r} fill="none" stroke={g.color} strokeWidth="6" strokeLinecap="round"
+                      strokeDasharray={`${dashVal} ${circ}`}
+                      style={{transition:"stroke-dasharray 0.9s cubic-bezier(.4,0,.2,1)"}}/>
+                  </g>
+                  <text x={cx} y={cy-6} textAnchor="middle" style={{fontSize:18,fontWeight:500,fill:"#1a1612",fontFamily:"system-ui"}}>{g.value}</text>
+                  <text x={cx} y={cy+7} textAnchor="middle" style={{fontSize:9,fill:"#a89e92",fontFamily:"system-ui"}}>of {g.goal}{g.unit}</text>
+                  <text x={cx} y={cy+19} textAnchor="middle" style={{fontSize:9,fill:atGoal?g.color:"#a89e92",fontFamily:"system-ui"}}>
+                    {atGoal ? "✓ goal" : `${Math.round(pct/goalPct*100)}%`}
+                  </text>
+                </svg>
+                <div style={{ fontSize:9, color:K.inkFaint, textTransform:"uppercase", letterSpacing:"0.11em", fontWeight:700 }}>{g.label}</div>
+                {Math.abs(diff) > 0 ? (
+                  <span style={{ fontSize:10, fontWeight:600, padding:"2px 7px", borderRadius:20,
+                    color:good?"#1a6e50":"#a03020", background:good?"#edf7f3":"#faf0ee" }}>
+                    {up?"↑":"↓"} {Math.abs(diff)}{g.unit} vs last wk
+                  </span>
+                ) : (
+                  <span style={{ fontSize:10, color:K.inkFaint }}>≈ same</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Quick stats strip */}
+        <div style={{ display:"flex", gap:8, paddingTop:12, borderTop:`1px solid ${K.border}` }}>
+          <div style={{ flex:1, textAlign:"center" }}>
+            <div style={{ fontSize:9, color:K.inkFaint, textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700, marginBottom:3 }}>Streak</div>
+            <div style={{ fontSize:18, fontWeight:600, color:streak>0?K.teal:K.inkFaint }}>{streak}<span style={{fontSize:11,color:K.inkFaint,marginLeft:2}}>d</span></div>
+          </div>
+          <div style={{ flex:1, textAlign:"center" }}>
+            <div style={{ fontSize:9, color:K.inkFaint, textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700, marginBottom:3 }}>Avg session</div>
+            <div style={{ fontSize:18, fontWeight:600, color:K.ink }}>{avgDur||"—"}<span style={{fontSize:11,color:K.inkFaint,marginLeft:2}}>min</span></div>
+          </div>
+          {bestPace && (
+            <div style={{ flex:1, textAlign:"center" }}>
+              <div style={{ fontSize:9, color:K.inkFaint, textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700, marginBottom:3 }}>Best pace</div>
+              <div style={{ fontSize:18, fontWeight:600, color:"#2563a8" }}>{bestPace.avg_pace_min_per_km.toFixed(2)}<span style={{fontSize:11,color:K.inkFaint,marginLeft:2}}>/km</span></div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── HOW YOU GOT THERE ── */}
+      {grouped.length > 0 && (
+        <div style={{...card}}>
+          <div style={{ ...sectionLabel, marginBottom:12 }}>How you got there</div>
+          {grouped.map((g,i) => (
+            <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:10,
+              padding:"9px 0", borderBottom:i<grouped.length-1?`1px solid ${K.border}`:"none" }}>
+              <div style={{ fontSize:15, flexShrink:0, marginTop:1 }}>{g.icon}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:500, color:K.ink }}>{g.label}</div>
+                <div style={{ fontSize:10, color:K.inkFaint, marginTop:1 }}>{g.sub}</div>
+              </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:3, alignItems:"flex-end", flexShrink:0 }}>
+                {g.tags.map((t,j) => (
+                  <span key={j} style={{ fontSize:9, background:t.bg, color:t.color,
+                    padding:"2px 6px", borderRadius:10, fontWeight:600 }}>{t.label}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── NEXT WEEK ── */}
+      <div style={{...card}}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:recs?14:0 }}>
+          <div style={{ ...sectionLabel, marginBottom:0 }}>Next week</div>
+          {!recs && (
+            <button onClick={getNextWeekPlan} disabled={loadingRecs}
+              style={{ background:loadingRecs?K.warm:K.ink, border:"none", borderRadius:8,
+                color:loadingRecs?K.inkFaint:"#fff", fontSize:11, padding:"6px 12px",
+                cursor:loadingRecs?"default":"pointer", fontWeight:600 }}>
+              {loadingRecs ? "Planning…" : "✦ Generate plan"}
+            </button>
+          )}
+          {recs && (
+            <button onClick={()=>setRecs(null)}
+              style={{ background:"transparent", border:"none", color:K.inkFaint,
+                fontSize:11, cursor:"pointer" }}>reset</button>
+          )}
+        </div>
+
+        {recs && (
+          <>
+            {/* Summary badge */}
+            {recs.summary && (
+              <div style={{ fontSize:11, color:K.teal, background:"#edf7f3",
+                padding:"6px 10px", borderRadius:8, marginBottom:14, fontWeight:500 }}>
+                {recs.summary}
+              </div>
+            )}
+
+            {/* 7-day calendar */}
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:4, marginBottom:14 }}>
+              {(recs.days||[]).map((day,i) => (
+                <div key={i} style={{ display:"flex", flexDirection:"column", gap:3 }}>
+                  <div style={{ fontSize:9, color:K.inkFaint, textAlign:"center", fontWeight:600,
+                    paddingBottom:3 }}>{day.date?.split(" ")[0]}</div>
+                  <div style={{ background:"#f7f4f0", borderRadius:8, padding:"5px 3px",
+                    minHeight:70, display:"flex", flexDirection:"column", gap:3, alignItems:"stretch" }}>
+                    <div style={{ fontSize:8, color:K.inkFaint, textAlign:"center" }}>{day.date?.split(" ")[1]}</div>
+                    {(day.activities||[]).map((a,j) => {
+                      const isRest = a.pillar==="rest" || a.type==="rest";
+                      return isRest ? (
+                        <div key={j} style={{ fontSize:8, color:"#d0c8be", textAlign:"center", marginTop:4 }}>rest</div>
+                      ) : (
+                        <div key={j} style={{ background:pillarBg[a.pillar]||"#f0ebe3",
+                          borderRadius:4, padding:"3px 4px", textAlign:"center" }}>
+                          <div style={{ fontSize:8, fontWeight:600, color:pillarColor[a.pillar]||K.inkMid }}>
+                            {a.label}
+                          </div>
+                          {a.duration && <div style={{ fontSize:7, color:pillarColor[a.pillar]||K.inkFaint, opacity:0.8 }}>{a.duration}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Coaching notes */}
+            {recs.notes?.length > 0 && (
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                {recs.notes.map((n,i) => (
+                  <div key={i} style={{ display:"flex", gap:8, alignItems:"flex-start" }}>
+                    <div style={{ width:6, height:6, borderRadius:"50%", background:K.teal,
+                      flexShrink:0, marginTop:4 }}/>
+                    <span style={{ fontSize:11, color:K.inkMid, lineHeight:1.5 }}>{n}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Pillar legend */}
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap", paddingTop:12,
+              marginTop:10, borderTop:`1px solid ${K.border}` }}>
+              {[["Zone 2","#2563a8","#e8f0fa"],["Strength","#c0780a","#fef3e2"],["Intensity","#b03020","#fdf0e8"],["Mobility","#6e3fa8","#f0eafa"]].map(([l,c,bg])=>(
+                <div key={l} style={{ display:"flex", alignItems:"center", gap:4 }}>
+                  <div style={{ width:8, height:8, borderRadius:2, background:bg, border:`1px solid ${c}` }}/>
+                  <span style={{ fontSize:9, color:K.inkFaint }}>{l}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {!recs && !loadingRecs && (
+          <div style={{ fontSize:12, color:K.inkFaint, marginTop:10, fontStyle:"italic" }}>
+            Get a personalized plan based on this week's training.
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 function BodyDomainView({ domain, onUpdate, onBack }) {
   const [daily, setDaily]     = useState([]);
   const [activities, setActs] = useState([]);
@@ -3924,111 +4262,11 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
 
       {/* ── MOVE ─────────────────────────────────────────────────────────── */}
       {tab==="exercise" && (
-        <>
-          <GoalEditor goals={goals} onChange={saveGoals} fields={[
-            {id:"weeklyKm",label:"Weekly km goal"},{id:"weeklyRuns",label:"Runs/week"},
-            {id:"weeklyStrength",label:"Strength/week"},{id:"dailySteps",label:"Daily steps"},
-          ]}/>
-
-          {/* Arc gauges — weekly km vs goal is the hero */}
-          <div style={{ ...card }}>
-            <div style={{ display:"flex", justifyContent:"space-around", paddingBottom:8 }}>
-              <ArcGauge value={+weekRunKm.toFixed(1)} goal={goals.weeklyKm} max={goals.weeklyKm*1.5}
-                size={116} color={K.blue} unit="km" label="Weekly km"/>
-              <ArcGauge value={weekRuns} goal={goals.weeklyRuns} max={7}
-                size={116} color={K.teal} unit="" label="Runs"/>
-              <ArcGauge value={weekStr} goal={goals.weeklyStrength} max={7}
-                size={116} color={K.yellow} unit="" label="Strength"/>
-            </div>
-            {/* Trend row */}
-            <div style={{ display:"flex", justifyContent:"space-around", paddingTop:8,
-              borderTop:`1px solid ${K.border}`, marginTop:4 }}>
-              <div style={{ textAlign:"center" }}>
-                <div style={{ fontSize:9, color:K.inkFaint, marginBottom:3 }}>vs last week</div>
-                <TrendPill current={weekRunKm} previous={weekRunKm2} unit="km" higherIsBetter={true}/>
-              </div>
-              <div style={{ textAlign:"center" }}>
-                <div style={{ fontSize:9, color:K.inkFaint, marginBottom:3 }}>runs</div>
-                <TrendPill current={weekRuns} previous={weekRuns2} higherIsBetter={true}/>
-              </div>
-              <div style={{ textAlign:"center" }}>
-                <div style={{ fontSize:9, color:K.inkFaint, marginBottom:3 }}>strength</div>
-                <TrendPill current={weekStr} previous={weekStr2} higherIsBetter={true}/>
-              </div>
-            </div>
-          </div>
-
-          {/* Streak + stats strip */}
-          <div style={{ display:"flex", gap:8, marginBottom:12 }}>
-            <div style={{ flex:1, background:streak>0?`#f0f7f4`:`#faf9f7`, borderRadius:12,
-              padding:"12px 14px", border:`1px solid ${streak>0?"#b8ddd0":K.border}` }}>
-              <div style={{ fontSize:9, color:K.inkFaint, textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700 }}>Streak</div>
-              <div style={{ fontSize:28, fontWeight:800, color:streak>0?K.teal:K.inkFaint, lineHeight:1.1 }}>
-                {streak}<span style={{ fontSize:13, color:K.inkFaint, marginLeft:3 }}>d</span>
-              </div>
-            </div>
-            <div style={{ flex:1, background:"#fafaf7", borderRadius:12, padding:"12px 14px", border:`1px solid ${K.border}` }}>
-              <div style={{ fontSize:9, color:K.inkFaint, textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700 }}>Avg session</div>
-              <div style={{ fontSize:28, fontWeight:800, color:K.ink, lineHeight:1.1 }}>
-                {avgDur||"—"}<span style={{ fontSize:13, color:K.inkFaint, marginLeft:3 }}>min</span>
-              </div>
-            </div>
-            {bestPace && (
-              <div style={{ flex:1, background:"#f7f9fa", borderRadius:12, padding:"12px 14px", border:`1px solid ${K.border}` }}>
-                <div style={{ fontSize:9, color:K.inkFaint, textTransform:"uppercase", letterSpacing:"0.08em", fontWeight:700 }}>Best pace</div>
-                <div style={{ fontSize:22, fontWeight:800, color:K.blue, lineHeight:1.1 }}>
-                  {bestPace.avg_pace_min_per_km.toFixed(2)}
-                </div>
-                <div style={{ fontSize:9, color:K.inkFaint }}>min/km</div>
-              </div>
-            )}
-          </div>
-
-          {/* Run km trend */}
-          {runs.length>2 && (
-            <div style={card}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                <div style={sectionLabel}>Distance per run</div>
-                {avgRunHR && <span style={{ fontSize:11, color:K.inkFaint }}>♡ {avgRunHR} bpm avg</span>}
-              </div>
-              <TrendLine data={[...runs.slice(0,10)].reverse().map(r=>(r.distance_meters||0)/1000)}
-                color={K.blue} height={48} goalLine={goals.weeklyKm/Math.max(goals.weeklyRuns,1)}/>
-              <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
-                <span style={{ fontSize:9, color:K.inkFaint }}>{runs[Math.min(9,runs.length-1)]?.date?.slice(5)}</span>
-                <span style={{ fontSize:9, color:K.inkFaint }}>{runs[0]?.date?.slice(5)}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Activity log */}
-          <div style={card}>
-            <div style={{ ...sectionLabel, marginBottom:10 }}>Recent</div>
-            {allEx.slice(0,8).map((a,i)=>(
-              <div key={i} style={{ display:"flex", alignItems:"center", gap:10,
-                padding:"9px 0", borderBottom:i<7?`1px solid ${K.border}`:"none" }}>
-                <div style={{ width:36, height:36, borderRadius:9, background:K.warm,
-                  display:"flex", alignItems:"center", justifyContent:"center", fontSize:17, flexShrink:0 }}>
-                  {actIcon(a.activity_type)}
-                </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:K.ink,
-                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                    {a.name||a.activity_type?.replace(/_/g," ")}
-                  </div>
-                  <div style={{ fontSize:10, color:K.inkFaint, marginTop:1 }}>
-                    {a.date?.slice(5)}{a.avg_hr?` · ${Math.round(a.avg_hr)}bpm`:""}{a.avg_pace_min_per_km?` · ${a.avg_pace_min_per_km.toFixed(2)}/km`:""}
-                  </div>
-                </div>
-                <div style={{ textAlign:"right", flexShrink:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:K.ink }}>{formatDur(a.duration_seconds)}</div>
-                  {a.distance_meters>100&&<div style={{ fontSize:10, color:K.inkFaint }}>{(a.distance_meters/1000).toFixed(1)}km</div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+        <ExerciseTab
+          daily={daily} activities={activities} goals={goals} onSaveGoals={saveGoals}
+          domain={domain} K={K} card={card} sectionLabel={sectionLabel}
+        />
       )}
-
       {/* ── SLEEP ────────────────────────────────────────────────────────── */}
       {tab==="sleep" && (
         <>
