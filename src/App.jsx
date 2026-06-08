@@ -1077,23 +1077,31 @@ function EditField({ label, value, field, placeholder, multiline, accentColor, o
 function TodoEditRow({ t, domainColor, todos, setTodos, setEditingTodo }) {
   const DURATIONS = ["15min","30min","1hr","2hr","half-day","full-day"];
   const DUR_COLOR = { "15min":C.green,"30min":C.green,"1hr":C.gold,"2hr":C.gold,"half-day":C.red,"full-day":C.red };
+  const textRef = useRef(null);
+  // Use local state only for duration/horizon/project to avoid remounting input
+  const [local, setLocal] = useState({ duration:t.duration, horizon:t.horizon, project:t.project });
+  const save = () => {
+    const text = textRef.current?.value?.trim() || t.text;
+    setTodos(todos.map(x => x.id===t.id ? { ...x, text, ...local } : x));
+    setEditingTodo(null);
+  };
   return (
     <div style={{ padding:"10px 0 14px", borderBottom:`1px solid ${C.border}`,
       background:C.caqiLight+"44", borderLeft:`3px solid ${domainColor}`, paddingLeft:10 }}>
-      <input dir="ltr" value={t.text}
-        onChange={e => setTodos(todos.map(x => x.id===t.id ? { ...x, text:e.target.value } : x))}
-        style={{ width:"100%", background:"transparent", border:"none",
+      <input dir="ltr" ref={textRef} defaultValue={t.text} autoFocus
+        onKeyDown={e => { if (e.key==="Enter") save(); if (e.key==="Escape") setEditingTodo(null); }}
+        style={{ width:"100%", background:"#fff", border:"none",
           borderBottom:`1px solid ${domainColor}`, color:C.ink, fontSize:14,
-          fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
+          fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
           padding:"3px 0", outline:"none", boxSizing:"border-box", marginBottom:10,
           direction:"ltr" }} />
       <div style={{ fontSize:10, color:C.inkFaint, fontFamily:"'SF Mono','Fira Code',monospace",
         textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Time</div>
       <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:10 }}>
         {DURATIONS.map(d => (
-          <button key={d} onClick={() => setTodos(todos.map(x => x.id===t.id ? { ...x, duration:d } : x))}
-            style={{ background:t.duration===d ? DUR_COLOR[d] : "transparent",
-              color:t.duration===d ? "#fff" : DUR_COLOR[d],
+          <button key={d} onClick={() => setLocal(l => ({...l, duration:d}))}
+            style={{ background:local.duration===d ? DUR_COLOR[d] : "transparent",
+              color:local.duration===d ? "#fff" : DUR_COLOR[d],
               border:`1.5px solid ${DUR_COLOR[d]}`,
               borderRadius:10, padding:"2px 9px", fontSize:10, cursor:"pointer",
               fontFamily:"'SF Mono','Fira Code',monospace" }}>{d}</button>
@@ -1103,12 +1111,12 @@ function TodoEditRow({ t, domainColor, todos, setTodos, setEditingTodo }) {
         textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>When</div>
       <div style={{ display:"flex", gap:4, marginBottom:10 }}>
         {HORIZONS.map(h => (
-          <button key={h} onClick={() => setTodos(todos.map(x => x.id===t.id ? { ...x, horizon:h } : x))}
-            style={{ flex:1, background:t.horizon===h ? domainColor : "transparent",
-              color:t.horizon===h ? "#fff" : C.inkLight,
-              border:`1.5px solid ${t.horizon===h ? domainColor : C.border}`,
+          <button key={h} onClick={() => setLocal(l => ({...l, horizon:h}))}
+            style={{ flex:1, background:local.horizon===h ? domainColor : "transparent",
+              color:local.horizon===h ? "#fff" : C.inkLight,
+              border:`1.5px solid ${local.horizon===h ? domainColor : C.border}`,
               borderRadius:4, padding:"3px 4px", fontSize:11, cursor:"pointer",
-              fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif", fontStyle:"italic",
+              fontFamily:"-apple-system,BlinkMacSystemFont,'Inter',sans-serif",
               textTransform:"capitalize" }}>{h}</button>
         ))}
       </div>
@@ -1116,17 +1124,22 @@ function TodoEditRow({ t, domainColor, todos, setTodos, setEditingTodo }) {
         textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Project</div>
       <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:12 }}>
         {PROJECTS.map(p => (
-          <button key={p} onClick={() => setTodos(todos.map(x => x.id===t.id ? { ...x, project:t.project===p?"":p } : x))}
-            style={{ background:t.project===p ? domainColor : "transparent",
-              color:t.project===p ? "#fff" : C.inkLight,
-              border:`1px solid ${t.project===p ? domainColor : C.border}`,
+          <button key={p} onClick={() => setLocal(l => ({...l, project:l.project===p?"":p}))}
+            style={{ background:local.project===p ? domainColor : "transparent",
+              color:local.project===p ? "#fff" : C.inkLight,
+              border:`1px solid ${local.project===p ? domainColor : C.border}`,
               borderRadius:4, padding:"2px 9px", fontSize:10, cursor:"pointer",
               fontFamily:"'SF Mono','Fira Code',monospace" }}>{p}</button>
         ))}
       </div>
-      <button onClick={() => setEditingTodo(null)}
-        style={{ background:domainColor, border:"none", borderRadius:4, color:"#fff",
-          fontSize:11, padding:"5px 14px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Done</button>
+      <div style={{ display:"flex", gap:8 }}>
+        <button onClick={save}
+          style={{ background:domainColor, border:"none", borderRadius:4, color:"#fff",
+            fontSize:11, padding:"5px 14px", cursor:"pointer", fontFamily:"inherit", fontWeight:600 }}>Save</button>
+        <button onClick={() => setEditingTodo(null)}
+          style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:4,
+            color:C.inkFaint, fontSize:11, padding:"5px 10px", cursor:"pointer" }}>Cancel</button>
+      </div>
     </div>
   );
 }
@@ -3750,7 +3763,7 @@ function ExerciseTab({ daily, activities, goals, onSaveGoals, domain, K, card, s
 
   // Week always Sun–Sat
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0=Sun
+  const dayOfWeek = (now.getDay() + 6) % 7; // 0=Mon
   const cutoff7  = new Date(now); cutoff7.setDate(now.getDate() - dayOfWeek);          cutoff7.setHours(0,0,0,0);
   const cutoff14 = new Date(now); cutoff14.setDate(now.getDate() - dayOfWeek - 7);    cutoff14.setHours(0,0,0,0);
   const cutoff21 = new Date(now); cutoff21.setDate(now.getDate() - dayOfWeek - 14);   cutoff21.setHours(0,0,0,0);
@@ -3847,44 +3860,59 @@ function ExerciseTab({ daily, activities, goals, onSaveGoals, domain, K, card, s
     setLoadingRecs(true);
     try {
       const today = new Date();
-      // Next week: next Sunday
-      const weekStart = new Date(today); 
-      const daysUntilSun = (7 - today.getDay()) % 7 || 7;
-      weekStart.setDate(today.getDate() + daysUntilSun);
-      const days = Array.from({length:7}, (_,i) => { const d=new Date(weekStart); d.setDate(weekStart.getDate()+i); return d; });
-      const prompt = `You are a personal trainer focused on longevity. Based on this week's data, plan next week's exercise.
+      const dayOfWeek = (today.getDay() + 6) % 7; // 0=Mon
+      const daysLeftInWeek = 6 - dayOfWeek;
+      const isMonday = dayOfWeek === 0;
 
-THIS WEEK:
+      // Monday = plan full week from today; mid-week = plan remaining days; Sunday = plan next week
+      let planStart, planDays, planLabel;
+      if (daysLeftInWeek === 0) {
+        // Sunday — plan next Mon–Sun
+        planStart = new Date(today); planStart.setDate(today.getDate() + 1);
+        planDays = 7; planLabel = "next week";
+      } else {
+        // Mid-week or Monday — plan from today to end of week
+        planStart = today;
+        planDays = daysLeftInWeek + 1;
+        planLabel = isMonday ? "this week" : `${planDays} days remaining this week`;
+      }
+
+      const days = Array.from({length: planDays}, (_, i) => {
+        const d = new Date(planStart); d.setDate(planStart.getDate() + i);
+        return d.toLocaleDateString("en-US", {weekday:"short", month:"numeric", day:"numeric"});
+      });
+
+      const prompt = `You are a personal trainer focused on longevity. Plan ${planLabel}.
+
+THIS WEEK SO FAR:
 - Zone 2 cardio: ${Math.round(weekZ2Min)} min (goal: ${goals.z2MinGoal||180} min)
 - Strength: ${weekStr} sessions (goal: ${goals.weeklyStrength||3})
 - High intensity: ${weekHiSess} sessions (goal: ${goals.weeklyHi||2})
 - Mobility: ${weekMob} sessions (goal: ${goals.weeklyMob||3})
 - Streak: ${streak} days
-- Avg stress this week: ${daily[0]?.stress_avg ? Math.round(daily[0].stress_avg) : "unknown"}
+- Avg stress: ${daily[0]?.stress_avg ? Math.round(daily[0].stress_avg) : "unknown"}
 
-NEXT WEEK DATES: ${days.map(d=>d.toLocaleDateString("en-US",{weekday:"short",month:"numeric",day:"numeric"})).join(", ")}
+DAYS TO PLAN: ${days.join(", ")}
 
-Return ONLY a JSON object (no markdown):
-{
-  "summary": "one line: what changes vs this week",
-  "days": [
-    {"date":"Mon Jun 8","activities":[{"type":"zone2","label":"Easy run","duration":"40m","pillar":"zone2"},...]},
-    ...7 days total, use "rest" for rest days
-  ],
-  "notes": ["max 3 short coaching notes, each under 15 words"]
-}
-Pillar values: "zone2", "strength", "intensity", "mobility", "rest"`;
+Return ONLY valid JSON (no markdown, no extra text):
+{"summary":"one line focus","days":[{"date":"Mon 6/9","activities":[{"label":"Easy run","duration":"40m","pillar":"zone2"}]},{"date":"Tue 6/10","activities":[{"label":"Rest","pillar":"rest"}]}],"notes":["note 1","note 2"]}
+Pillar must be exactly: zone2, strength, intensity, mobility, or rest`;
 
       const resp = await fetch("/api/claude", {
         method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:800,
-          messages:[{role:"user",content:prompt}] })
+        body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000,
+          messages:[{role:"user", content:prompt}] })
       });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
-      const text = data.content?.find(b=>b.type==="text")?.text||"{}";
-      const plan = JSON.parse(text.replace(/```json|```/g,"").trim());
+      const raw = data.content?.find(b=>b.type==="text")?.text || "{}";
+      const clean = raw.replace(/```json|```/g,"").trim();
+      const plan = JSON.parse(clean);
       setRecs(plan);
-    } catch(e) { console.error(e); }
+    } catch(e) {
+      console.error("Plan error:", e);
+      setRecs({ summary:"Plan failed — check browser console", days:[], notes:[String(e)] });
+    }
     setLoadingRecs(false);
   };
 
@@ -4144,10 +4172,13 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
 
   // Week always Sun–Sat
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0=Sun
+  const dayOfWeek = (now.getDay() + 6) % 7; // 0=Mon
   const cutoff7  = new Date(now); cutoff7.setDate(now.getDate() - dayOfWeek);          cutoff7.setHours(0,0,0,0);
   const cutoff14 = new Date(now); cutoff14.setDate(now.getDate() - dayOfWeek - 7);    cutoff14.setHours(0,0,0,0);
   const cutoff21 = new Date(now); cutoff21.setDate(now.getDate() - dayOfWeek - 14);   cutoff21.setHours(0,0,0,0);
+  const toDS = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  const cutoff7Str  = toDS(cutoff7);
+  const cutoff14Str = toDS(cutoff14);
   const week7Acts  = allEx.filter(a=>a.date>=cutoff7Str);
   const week14Acts = allEx.filter(a=>a.date>=cutoff14Str&&a.date<cutoff7Str);
   const weekRunKm  = runs.filter(a=>a.date>=cutoff7Str).reduce((s,a)=>s+((a.distance_meters||0)/1000),0);
