@@ -3752,8 +3752,8 @@ function GoalEditor({ goals, onChange, fields }) {
 }
 
 // ── EXERCISE TAB ─────────────────────────────────────────────────────────────
-function ExerciseTab({ daily, activities, goals, onSaveGoals, domain, K, card, sectionLabel }) {
-  const [recs, setRecs]         = useState(null);
+function ExerciseTab({ daily, activities, goals, onSaveGoals, domain, onUpdate, K, card, sectionLabel }) {
+  const [recs, setRecs] = useState(domain.weekPlan || null);
   const [loadingRecs, setLoadingRecs] = useState(false);
 
   const runs     = activities.filter(a=>a.activity_type==="running");
@@ -3909,6 +3909,7 @@ Pillar must be exactly: zone2, strength, intensity, mobility, or rest`;
       const clean = raw.replace(/```json|```/g,"").trim();
       const plan = JSON.parse(clean);
       setRecs(plan);
+      onUpdate({ ...domain, weekPlan: plan });
     } catch(e) {
       console.error("Plan error:", e);
       setRecs({ summary:"Plan failed — check browser console", days:[], notes:[String(e)] });
@@ -4034,7 +4035,7 @@ Pillar must be exactly: zone2, strength, intensity, mobility, or rest`;
             </button>
           )}
           {recs && (
-            <button onClick={()=>setRecs(null)}
+            <button onClick={()=>{ setRecs(null); onUpdate({...domain, weekPlan:null}); }}
               style={{ background:"transparent", border:"none", color:K.inkFaint,
                 fontSize:11, cursor:"pointer" }}>reset</button>
           )}
@@ -4133,6 +4134,23 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
   const saveGoals = (g) => {
     setGoals(g);
     onUpdate({ ...domain, bodyGoals: g });
+  };
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncLog, setSyncLog] = useState(null);
+
+  const syncGarmin = async () => {
+    setSyncing(true);
+    setSyncLog(null);
+    try {
+      const r = await fetch("/api/garmin-sync", { method:"POST" });
+      const d = await r.json();
+      setSyncLog(d);
+      if (d.ok) await loadData(); // refresh display
+    } catch(e) {
+      setSyncLog({ ok:false, error:e.message });
+    }
+    setSyncing(false);
   };
 
   const loadData = async () => {
@@ -4274,13 +4292,32 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
           {lastSync && <span style={{ fontSize:11, color:K.inkFaint }}>{lastSync}</span>}
+          <button onClick={syncGarmin} disabled={syncing}
+            style={{ background:syncing?K.warm:K.ink, border:"none", borderRadius:8,
+              color:syncing?K.inkFaint:"#fff", fontSize:11, padding:"6px 12px",
+              cursor:syncing?"default":"pointer", fontWeight:600 }}>
+            {syncing ? "Syncing…" : "⟳ Sync Garmin"}
+          </button>
           <button onClick={loadData} disabled={loading}
             style={{ background:K.warm, border:`1px solid ${K.border}`, borderRadius:8,
-              color:K.inkMid, fontSize:12, padding:"5px 11px", cursor:loading?"default":"pointer", fontWeight:500 }}>
+              color:K.inkMid, fontSize:12, padding:"5px 8px",
+              cursor:loading?"default":"pointer" }}>
             {loading?"…":"↻"}
           </button>
         </div>
       </div>
+      {syncLog && (
+        <div style={{ margin:"0 16px 8px", padding:"10px 12px", borderRadius:8,
+          background: syncLog.ok ? "#f0faf4" : "#fdf3f0",
+          border:`1px solid ${syncLog.ok?"#b8ddd0":"#f0c0b0"}` }}>
+          <div style={{ fontSize:11, fontWeight:600, color:syncLog.ok?K.teal:K.red, marginBottom:4 }}>
+            {syncLog.ok ? `✓ Synced: ${syncLog.summary} in ${syncLog.duration}` : `✗ ${syncLog.error}`}
+          </div>
+          {syncLog.log?.slice(-4).map((l,i) => (
+            <div key={i} style={{ fontSize:10, color:K.inkFaint, fontFamily:"'SF Mono',monospace" }}>{l}</div>
+          ))}
+        </div>
+      )}
 
       {/* Tabs — pill style, warm */}
       <div style={{ display:"flex", gap:4, padding:"0 16px 14px" }}>
@@ -4309,7 +4346,7 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
       {tab==="exercise" && (
         <ExerciseTab
           daily={daily} activities={activities} goals={goals} onSaveGoals={saveGoals}
-          domain={domain} K={K} card={card} sectionLabel={sectionLabel}
+          domain={domain} onUpdate={onUpdate} K={K} card={card} sectionLabel={sectionLabel}
         />
       )}
       {/* ── SLEEP ────────────────────────────────────────────────────────── */}
