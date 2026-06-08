@@ -3778,8 +3778,11 @@ function ExerciseTab({ daily, activities, goals, onSaveGoals, domain, K, card, s
   };
 
   // Week totals
-  const weekActs  = allEx.filter(a=>new Date(a.date)>=cutoff7);
-  const weekActs2 = allEx.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7);
+  const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  const cutoff7Str  = toDateStr(cutoff7);
+  const cutoff14Str = toDateStr(cutoff14);
+  const weekActs  = allEx.filter(a=>a.date>=cutoff7Str);
+  const weekActs2 = allEx.filter(a=>a.date>=cutoff14Str&&a.date<cutoff7Str);
 
   const weekZ2Min = weekActs.reduce((s,a) => {
     const hr = a.avg_hr; const dMin = (a.duration_seconds||0)/60;
@@ -3794,10 +3797,10 @@ function ExerciseTab({ daily, activities, goals, onSaveGoals, domain, K, card, s
 
   const weekHiSess  = weekActs.filter(a=>a.avg_hr>=hiMin).length;
   const weekHiSess2 = weekActs2.filter(a=>a.avg_hr>=hiMin).length;
-  const weekStr  = strength.filter(a=>new Date(a.date)>=cutoff7).length;
-  const weekStr2 = strength.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7).length;
-  const weekMob  = mobility.filter(a=>new Date(a.date)>=cutoff7).length;
-  const weekMob2 = mobility.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7).length;
+  const weekStr  = strength.filter(a=>a.date>=cutoff7Str).length;
+  const weekStr2 = strength.filter(a=>a.date>=cutoff14Str&&a.date<cutoff7Str).length;
+  const weekMob  = mobility.filter(a=>a.date>=cutoff7Str).length;
+  const weekMob2 = mobility.filter(a=>a.date>=cutoff14Str&&a.date<cutoff7Str).length;
 
   const actDates = new Set(activities.map(a=>a.date));
   let streak = 0;
@@ -4145,18 +4148,18 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
   const cutoff7  = new Date(now); cutoff7.setDate(now.getDate() - dayOfWeek);          cutoff7.setHours(0,0,0,0);
   const cutoff14 = new Date(now); cutoff14.setDate(now.getDate() - dayOfWeek - 7);    cutoff14.setHours(0,0,0,0);
   const cutoff21 = new Date(now); cutoff21.setDate(now.getDate() - dayOfWeek - 14);   cutoff21.setHours(0,0,0,0);
-  const week7Acts  = allEx.filter(a=>new Date(a.date)>=cutoff7);
-  const week14Acts = allEx.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7);
-  const weekRunKm  = runs.filter(a=>new Date(a.date)>=cutoff7).reduce((s,a)=>s+((a.distance_meters||0)/1000),0);
-  const weekRunKm2 = runs.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7).reduce((s,a)=>s+((a.distance_meters||0)/1000),0);
-  const weekRuns   = runs.filter(a=>new Date(a.date)>=cutoff7).length;
-  const weekRuns2  = runs.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7).length;
+  const week7Acts  = allEx.filter(a=>a.date>=cutoff7Str);
+  const week14Acts = allEx.filter(a=>a.date>=cutoff14Str&&a.date<cutoff7Str);
+  const weekRunKm  = runs.filter(a=>a.date>=cutoff7Str).reduce((s,a)=>s+((a.distance_meters||0)/1000),0);
+  const weekRunKm2 = runs.filter(a=>a.date>=cutoff14Str&&a.date<cutoff7Str).reduce((s,a)=>s+((a.distance_meters||0)/1000),0);
+  const weekRuns   = runs.filter(a=>a.date>=cutoff7Str).length;
+  const weekRuns2  = runs.filter(a=>a.date>=cutoff14Str&&a.date<cutoff7Str).length;
   const avgDur     = week7Acts.length ? Math.round(week7Acts.reduce((s,a)=>s+(a.duration_seconds||0),0)/week7Acts.length/60) : null;
   const avgRunHRArr = runs.filter(r=>r.avg_hr).slice(0,10);
   const avgRunHR = avgRunHRArr.length ? Math.round(avgRunHRArr.reduce((s,r)=>s+r.avg_hr,0)/avgRunHRArr.length) : null;
   const bestPace = runs.filter(r=>r.avg_pace_min_per_km).sort((a,b)=>a.avg_pace_min_per_km-b.avg_pace_min_per_km)[0];
-  const weekStr    = strength.filter(a=>new Date(a.date)>=cutoff7).length;
-  const weekStr2   = strength.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7).length;
+  const weekStr    = strength.filter(a=>a.date>=cutoff7Str).length;
+  const weekStr2   = strength.filter(a=>a.date>=cutoff14Str&&a.date<cutoff7Str).length;
 
   const avgStress7  = week7.filter(d=>d.stress_avg).length ? Math.round(week7.filter(d=>d.stress_avg).reduce((s,d)=>s+d.stress_avg,0)/week7.filter(d=>d.stress_avg).length) : null;
   const avgStress14 = daily.slice(7,14).filter(d=>d.stress_avg).length ? Math.round(daily.slice(7,14).filter(d=>d.stress_avg).reduce((s,d)=>s+d.stress_avg,0)/daily.slice(7,14).filter(d=>d.stress_avg).length) : null;
