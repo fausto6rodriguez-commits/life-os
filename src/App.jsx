@@ -3748,8 +3748,12 @@ function ExerciseTab({ daily, activities, goals, onSaveGoals, domain, K, card, s
   const mobility = activities.filter(a=>["yoga","stretching","meditation"].includes(a.activity_type));
   const allEx    = activities.filter(a=>!["meditation"].includes(a.activity_type));
 
-  const cutoff7  = new Date(); cutoff7.setDate(cutoff7.getDate()-7);
-  const cutoff14 = new Date(); cutoff14.setDate(cutoff14.getDate()-14);
+  // Week always Sun–Sat
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun
+  const cutoff7  = new Date(now); cutoff7.setDate(now.getDate() - dayOfWeek);          cutoff7.setHours(0,0,0,0);
+  const cutoff14 = new Date(now); cutoff14.setDate(now.getDate() - dayOfWeek - 7);    cutoff14.setHours(0,0,0,0);
+  const cutoff21 = new Date(now); cutoff21.setDate(now.getDate() - dayOfWeek - 14);   cutoff21.setHours(0,0,0,0);
 
   // ── Pillar classification ────────────────────────────────────────────────
   // Zone 2: avg HR 60-75% of max (est max ~175). Zone 2 = 105-131 bpm
@@ -3840,7 +3844,10 @@ function ExerciseTab({ daily, activities, goals, onSaveGoals, domain, K, card, s
     setLoadingRecs(true);
     try {
       const today = new Date();
-      const weekStart = new Date(today); weekStart.setDate(today.getDate() + (1 - today.getDay() + 7) % 7 || 7);
+      // Next week: next Sunday
+      const weekStart = new Date(today); 
+      const daysUntilSun = (7 - today.getDay()) % 7 || 7;
+      weekStart.setDate(today.getDate() + daysUntilSun);
       const days = Array.from({length:7}, (_,i) => { const d=new Date(weekStart); d.setDate(weekStart.getDate()+i); return d; });
       const prompt = `You are a personal trainer focused on longevity. Based on this week's data, plan next week's exercise.
 
@@ -3891,7 +3898,7 @@ Pillar values: "zone2", "strength", "intensity", "mobility", "rest"`;
       {/* ── SCORECARD ── */}
       <div style={{...card}}>
         <div style={{ fontSize:9, color:K.inkFaint, textTransform:"uppercase", letterSpacing:"0.11em", fontWeight:700, marginBottom:16 }}>
-          This week
+          This week · {cutoff7.toLocaleDateString("en-US",{month:"short",day:"numeric"})} – {new Date(cutoff7.getTime()+6*86400000).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:2, marginBottom:8 }}>
           {[
@@ -4132,8 +4139,12 @@ function BodyDomainView({ domain, onUpdate, onBack }) {
     else if(i>0) break;
   }
 
-  const cutoff7  = new Date(); cutoff7.setDate(cutoff7.getDate()-7);
-  const cutoff14 = new Date(); cutoff14.setDate(cutoff14.getDate()-14);
+  // Week always Sun–Sat
+  const now = new Date();
+  const dayOfWeek = now.getDay(); // 0=Sun
+  const cutoff7  = new Date(now); cutoff7.setDate(now.getDate() - dayOfWeek);          cutoff7.setHours(0,0,0,0);
+  const cutoff14 = new Date(now); cutoff14.setDate(now.getDate() - dayOfWeek - 7);    cutoff14.setHours(0,0,0,0);
+  const cutoff21 = new Date(now); cutoff21.setDate(now.getDate() - dayOfWeek - 14);   cutoff21.setHours(0,0,0,0);
   const week7Acts  = allEx.filter(a=>new Date(a.date)>=cutoff7);
   const week14Acts = allEx.filter(a=>new Date(a.date)>=cutoff14&&new Date(a.date)<cutoff7);
   const weekRunKm  = runs.filter(a=>new Date(a.date)>=cutoff7).reduce((s,a)=>s+((a.distance_meters||0)/1000),0);
