@@ -3860,21 +3860,21 @@ function ExerciseTab({ daily, activities, goals, onSaveGoals, domain, onUpdate, 
     setLoadingRecs(true);
     try {
       const today = new Date();
+      const todayStr = toDateStr(today);
       const dayOfWeek = (today.getDay() + 6) % 7; // 0=Mon
       const daysLeftInWeek = 6 - dayOfWeek;
-      const isMonday = dayOfWeek === 0;
 
-      // Monday = plan full week from today; mid-week = plan remaining days; Sunday = plan next week
+      // Always plan from TOMORROW to end of week (or next Mon–Sun if Sunday)
       let planStart, planDays, planLabel;
       if (daysLeftInWeek === 0) {
-        // Sunday — plan next Mon–Sun
+        // Sunday — plan full next week
         planStart = new Date(today); planStart.setDate(today.getDate() + 1);
-        planDays = 7; planLabel = "next week";
+        planDays = 7; planLabel = "next week (Mon–Sun)";
       } else {
-        // Mid-week or Monday — plan from today to end of week
-        planStart = today;
-        planDays = daysLeftInWeek + 1;
-        planLabel = isMonday ? "this week" : `${planDays} days remaining this week`;
+        // Plan tomorrow through end of week
+        planStart = new Date(today); planStart.setDate(today.getDate() + 1);
+        planDays = daysLeftInWeek;
+        planLabel = `remaining days this week`;
       }
 
       const days = Array.from({length: planDays}, (_, i) => {
@@ -3882,21 +3882,37 @@ function ExerciseTab({ daily, activities, goals, onSaveGoals, domain, onUpdate, 
         return d.toLocaleDateString("en-US", {weekday:"short", month:"numeric", day:"numeric"});
       });
 
-      const prompt = `You are a personal trainer focused on longevity. Plan ${planLabel}.
+      // Build what's already been done this week
+      const doneThisWeek = grouped.map(g =>
+        `- ${g.label}: ${g.sub} → ${g.tags.map(t=>t.label).join(", ")}`
+      ).join("\n") || "- Nothing yet";
 
-THIS WEEK SO FAR:
-- Zone 2 cardio: ${Math.round(weekZ2Min)} min (goal: ${goals.z2MinGoal||180} min)
-- Strength: ${weekStr} sessions (goal: ${goals.weeklyStrength||3})
-- High intensity: ${weekHiSess} sessions (goal: ${goals.weeklyHi||2})
-- Mobility: ${weekMob} sessions (goal: ${goals.weeklyMob||3})
+      // How much is still needed to hit goals
+      const z2Remaining    = Math.max(0, (goals.z2MinGoal||180) - Math.round(weekZ2Min));
+      const strRemaining   = Math.max(0, (goals.weeklyStrength||3) - weekStr);
+      const hiRemaining    = Math.max(0, (goals.weeklyHi||2) - weekHiSess);
+      const mobRemaining   = Math.max(0, (goals.weeklyMob||3) - weekMob);
+
+      const prompt = `You are a personal trainer focused on longevity. Plan the ${planLabel} for someone who trains for health and longevity.
+
+ALREADY DONE THIS WEEK:
+${doneThisWeek}
+
+PROGRESS TOWARD WEEKLY GOALS:
+- Zone 2: ${Math.round(weekZ2Min)}/${goals.z2MinGoal||180} min (${z2Remaining} min still needed)
+- Strength: ${weekStr}/${goals.weeklyStrength||3} sessions (${strRemaining} more needed)
+- High intensity: ${weekHiSess}/${goals.weeklyHi||2} sessions (${hiRemaining} more needed)
+- Mobility: ${weekMob}/${goals.weeklyMob||3} sessions (${mobRemaining} more needed)
 - Streak: ${streak} days
-- Avg stress: ${daily[0]?.stress_avg ? Math.round(daily[0].stress_avg) : "unknown"}
+- Avg stress this week: ${daily[0]?.stress_avg ? Math.round(daily[0].stress_avg) : "unknown"}/100 ${(daily[0]?.stress_avg||0) > 50 ? "(HIGH — ease up on intensity)" : ""}
 
 DAYS TO PLAN: ${days.join(", ")}
 
-Return ONLY valid JSON (no markdown, no extra text):
-{"summary":"one line focus","days":[{"date":"Mon 6/9","activities":[{"label":"Easy run","duration":"40m","pillar":"zone2"}]},{"date":"Tue 6/10","activities":[{"label":"Rest","pillar":"rest"}]}],"notes":["note 1","note 2"]}
-Pillar must be exactly: zone2, strength, intensity, mobility, or rest`;
+Plan only what's needed to close the gaps. Don't add sessions that aren't needed. If goals are already met, plan rest or light mobility only. Respect recovery — don't put intensity back-to-back.
+
+Return ONLY valid JSON (no markdown, no explanation):
+{"summary":"one line: what to focus on to close the week","days":[{"date":"Tue 6/10","activities":[{"label":"Easy run","duration":"45m","pillar":"zone2"}]},{"date":"Wed 6/11","activities":[{"label":"Rest","pillar":"rest"}]}],"notes":["coaching note under 15 words","another note"]}
+Pillar must be exactly one of: zone2, strength, intensity, mobility, rest`;
 
       const resp = await fetch("/api/claude", {
         method:"POST", headers:{"Content-Type":"application/json"},
